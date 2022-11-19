@@ -97,10 +97,10 @@ def job_search_ask_name(update, context):
         text=responses["JOB_SEARCH_ASK_NAME"]
     )
     message = update.effective_message
-    context.bot.delete_message(
-        chat_id=message.chat_id,
-        message_id=message.message_id
-    )
+    # context.bot.delete_message(
+    #     chat_id=message.chat_id,
+    #     message_id=message.message_id
+    # )
     # context.bot.delete_message(
     #     chat_id=update.message.chat_id,
     #     message_id=update.message.message_id
@@ -114,10 +114,10 @@ def job_search_ask_postcode(update, context):
         chat_id=update.message.chat_id,
         text=responses["JOB_SEARCH_ASK_POSTCODE"]
     )
-    context.bot.delete_message(
-        chat_id=update.message.chat_id,
-        message_id=update.message.message_id
-    )
+    # context.bot.delete_message(
+    #     chat_id=update.message.chat_id,
+    #     message_id=update.message.message_id
+    # )
     return AWAITING_JOB_APPLICANT_POSTCODE
 
 
@@ -138,10 +138,10 @@ def job_search_confirm_postcode(update, context):
             chat_id=update.message.chat_id,
             text=responses["WRONG_POSTCODE"]
             )
-        context.bot.delete_message(
-            chat_id=update.message.chat_id,
-            message_id=update.message.message_id
-        )
+        # context.bot.delete_message(
+        #     chat_id=update.message.chat_id,
+        #     message_id=update.message.message_id
+        # )
         return AWAITING_JOB_APPLICANT_POSTCODE
 
     else:
@@ -150,10 +150,10 @@ def job_search_confirm_postcode(update, context):
             text=address_summary,
             reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
-        context.bot.delete_message(
-            chat_id=update.message.chat_id,
-            message_id=update.message.message_id
-        )
+        # context.bot.delete_message(
+        #     chat_id=update.message.chat_id,
+        #     message_id=update.message.message_id
+        # )
         return CONFIRM_JOB_APPLICANT_POSTCODE
 
 def job_search_ask_language(update, context):
@@ -162,10 +162,10 @@ def job_search_ask_language(update, context):
         text=responses["JOB_SEARCH_ASK_LANGUAGE"],
         reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
-    context.bot.delete_message(
-        chat_id=update.message.chat_id,
-        message_id=update.message.message_id
-    )
+    # context.bot.delete_message(
+    #     chat_id=update.message.chat_id,
+    #     message_id=update.message.message_id
+    # )
     return AWAITING_JOB_APPLICANT_LANGUAGE
 
 def job_search_ask_job_categories(update, context):
@@ -175,10 +175,10 @@ def job_search_ask_job_categories(update, context):
         text=responses["JOB_SEARCH_ASK_CATEGORIES"],
         reply_markup=reply_markup
         )
-    context.bot.delete_message(
-        chat_id=update.message.chat_id,
-        message_id=update.message.message_id
-    )
+    # context.bot.delete_message(
+    #     chat_id=update.message.chat_id,
+    #     message_id=update.message.message_id
+    # )
     return SAVE_JOB_SEARCH_APPLICATION
 
 def update_button(callback_text):
@@ -198,6 +198,7 @@ def keyboard_callback(update, context):
 
     else:
         JOB_CATEGORIES = update_button(query.data)
+        context.user_data['user_data']['job_category'] = JOB_CATEGORIES
 
         query.answer(f'selected: {JOB_CATEGORIES[query.data]}')
 
@@ -215,14 +216,37 @@ def keyboard_callback(update, context):
         return SAVE_JOB_SEARCH_APPLICATION
 
 
+def prepare_job_categories_for_saving(categories):
+    if not categories:
+        return {}
+    selected_categories = []
+    for cat in categories:
+        if '✔️' in categories[cat]:
+            category = categories[cat].split('✔️')[-1].strip()
+            selected_categories.append(category)
+    return selected_categories
+
+
 def job_search_save_application(update, context, query):
-    context.user_data['user_data']['job_category'] = update.effective_message.text
+    context.user_data['user_data']['job_category'] = prepare_job_categories_for_saving(
+        categories=context.user_data['user_data'].get('job_category')
+    )
     context.user_data['user_data']['timestamp'] = dt.utcnow().replace(tzinfo=amsterdam_timezone)
 
     job_applicant_summary = responses["JOB_APPLICANT_SUMMARY"]
     for field in ['first_name', 'city', 'speak_english', 'job_category']:
-        job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
-        dbservice.update_user_data(update.message, {field: context.user_data['user_data'][field]})
+        if field == "job_category":
+            try:
+                selected_jobs_text = ", ".join(context.user_data['user_data'][field])
+                job_applicant_summary = job_applicant_summary.replace('{' + field + '}', selected_jobs_text)
+            except Exception as e:
+                print(e)
+                continue
+        else:
+            job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
+        dbservice.update_user_data(
+            user_id=context.user_data["user_data"]["user_id"], update_dict={field: context.user_data['user_data'][field]}
+        )
 
     context.bot.send_message(
         chat_id=query.message.chat_id,
