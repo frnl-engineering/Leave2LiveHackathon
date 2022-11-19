@@ -131,6 +131,7 @@ class DBService:
         try:
             self._jobs_collection.insert_one(
                 {
+                    "_id": job["id"],
                     "title": job["title"],
                     "company": job["company"],
                     "description": job["description"],

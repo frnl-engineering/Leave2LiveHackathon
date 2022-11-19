@@ -240,55 +240,6 @@ def main():
 
     dp.add_error_handler(error)
 
-
-    # For tests
-    dbservice.insert_job(
-        {
-            "title": "Waiter",
-            "company": "Cafe de Koffie",
-            "description": "We are looking for a waiter, 9-5",
-            "link": "https://www.caferestaurant-deventer.nl",
-            "category": "Cafe and restaurants",
-            "city": "Deventer",
-            "salary": "€ 10 per hour",
-            "created_at": dt.utcnow(),
-            "updated_at": dt.utcnow(),
-            "languages": ["English", "Dutch"],
-            "status": "active",
-        }
-    )
-
-    dbservice.insert_job(
-        {
-            "title": "Cook",
-            "company": "McDonalds",
-            "link": "https://www.mcdonalds.com/nl/nl-nl.html",
-            "description": "",
-            "category": "Cafe and restaurants",
-            "city": "Enschede",
-            "salary": "€ 12 per hour",
-            "created_at": dt.utcnow(),
-            "updated_at": dt.utcnow(),
-            "languages": [],
-            "status": "active",
-        }
-    )
-    dbservice.insert_job(
-        {
-            "title": "Cook",
-            "company": "McDonalds",
-            "link": "https://www.mcdonalds.com/nl/nl-nl.html",
-            "description": "",
-            "category": "Cafe and restaurants",
-            "city": "Enschede",
-            "salary": "€ 50 per hour",
-            "created_at": dt.utcnow(),
-            "updated_at": dt.utcnow(),
-            "languages": [],
-            "status": "new",
-        }
-    )
-
     updater.start_polling()
     updater.idle()
 
