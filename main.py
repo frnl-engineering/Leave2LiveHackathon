@@ -17,9 +17,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from telegram import ReplyKeyboardMarkup, Update
+from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
-    ContextTypes
+    ContextTypes, CallbackQueryHandler
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,10 +51,21 @@ YES_BUTTON = "✅ Yes"
 NO_BUTTON = "❌ No"
 UPLOAD_PHOTO_BUTTON = "📸 Upload photo"
 SHARE_LINK_BUTTON = "📝 Share a link/text"
-COURIER_BUTTON = "🚚 Courier"
-WAITER_BUTTON = "💁 Waiter / hostess"
-HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
+SUBMIT_CATEGORY_BUTTON = "Submit"
 
+JOB_CATEGORIES = {
+    "COURIER_BUTTON": "☐ 🚚 Courier",
+    "WAITER_BUTTON": "☐ 💁 Waiter / hostess",
+    "HANDYMAN_BUTTON": "☐ 🔨Handyman in the kitchen / in the hotel"
+    }
+
+
+keyboard = [
+    [InlineKeyboardButton(JOB_CATEGORIES["COURIER_BUTTON"], callback_data='COURIER_BUTTON')], 
+    [InlineKeyboardButton(JOB_CATEGORIES["WAITER_BUTTON"], callback_data='WAITER_BUTTON')], 
+    [InlineKeyboardButton(JOB_CATEGORIES["HANDYMAN_BUTTON"], callback_data='HANDYMAN_BUTTON')], 
+    [InlineKeyboardButton(SUBMIT_CATEGORY_BUTTON, callback_data=SUBMIT_CATEGORY_BUTTON)]]
+reply_markup = InlineKeyboardMarkup(keyboard)
 
 menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
@@ -62,23 +73,51 @@ dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv(
 
 def start_command(update, context):
     logger.info('%s: start_command' % update.message.from_user['id'])
-    update.message.reply_text(
-        responses["WELCOME_MESSAGE"],
-        reply_markup=menu_kb
-        )
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=responses["WELCOME_MESSAGE"],
+        reply_markup=menu_kb)
+    message = update.effective_message
+    context.bot.delete_message(
+        chat_id=message.chat_id,
+        message_id=message.message_id
+    )
+    # context.bot.delete_message(
+    #     chat_id=update.message.chat_id,
+    #     message_id=update.message.message_id
+    # )
     return WELCOME
 
 def job_search_ask_name(update, context):
     logger.info('%s: job_search_ask_name' % update.message.from_user['id'])
     _create_user_data_object(update, context)
     dbservice.register_user(update.message)
-    update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=responses["JOB_SEARCH_ASK_NAME"]
+    )
+    message = update.effective_message
+    context.bot.delete_message(
+        chat_id=message.chat_id,
+        message_id=message.message_id
+    )
+    # context.bot.delete_message(
+    #     chat_id=update.message.chat_id,
+    #     message_id=update.message.message_id
+    # )
     return AWAITING_JOB_APPLICANT_NAME
 
 def job_search_ask_postcode(update, context):
     logger.info('%s: job_search_ask_postcode' % update.message.from_user['id'])
     context.user_data['user_data']['first_name'] = update.effective_message.text
-    update.message.reply_text(responses["JOB_SEARCH_ASK_POSTCODE"])
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=responses["JOB_SEARCH_ASK_POSTCODE"]
+    )
+    context.bot.delete_message(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id
+    )
     return AWAITING_JOB_APPLICANT_POSTCODE
 
 
@@ -95,32 +134,88 @@ def job_search_confirm_postcode(update, context):
         address_summary = address_summary.replace('{city}', context.user_data['user_data']['city'])
 
     if not postcode_is_correct or not address_summary:
-        update.message.reply_text(responses["WRONG_POSTCODE"])
+        context.bot.send_message(
+            chat_id=update.message.chat_id,
+            text=responses["WRONG_POSTCODE"]
+            )
+        context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id
+        )
         return AWAITING_JOB_APPLICANT_POSTCODE
 
     else:
-        update.message.reply_text(
-            address_summary,
+        context.bot.send_message(
+            chat_id=update.message.chat_id,
+            text=address_summary,
             reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+        )
+        context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id
         )
         return CONFIRM_JOB_APPLICANT_POSTCODE
 
 def job_search_ask_language(update, context):
-    update.message.reply_text(
-        responses["JOB_SEARCH_ASK_LANGUAGE"],
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=responses["JOB_SEARCH_ASK_LANGUAGE"],
         reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
+    context.bot.delete_message(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id
+    )
     return AWAITING_JOB_APPLICANT_LANGUAGE
 
 def job_search_ask_job_categories(update, context):
     context.user_data['user_data']['speak_english'] = update.effective_message.text
-    update.message.reply_text(
-        responses["JOB_SEARCH_ASK_CATEGORIES"],
-        reply_markup=ReplyKeyboardMarkup([[COURIER_BUTTON, WAITER_BUTTON, HANDYMAN_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=responses["JOB_SEARCH_ASK_CATEGORIES"],
+        reply_markup=reply_markup
         )
+    context.bot.delete_message(
+        chat_id=update.message.chat_id,
+        message_id=update.message.message_id
+    )
     return SAVE_JOB_SEARCH_APPLICATION
 
-def job_search_save_application(update, context):
+def update_button(callback_text):
+
+    if '✔️' in JOB_CATEGORIES[callback_text]:
+        JOB_CATEGORIES[callback_text] = JOB_CATEGORIES[callback_text].replace('✔️', '☐')
+    elif '☐' in JOB_CATEGORIES[callback_text]:
+        JOB_CATEGORIES[callback_text] = JOB_CATEGORIES[callback_text].replace('☐', '✔️')
+
+    return JOB_CATEGORIES
+
+def keyboard_callback(update, context):
+    query = update.callback_query
+
+    if query.data == SUBMIT_CATEGORY_BUTTON:
+        return job_search_save_application(update, context, query)
+
+    else:
+        JOB_CATEGORIES = update_button(query.data)
+
+        query.answer(f'selected: {JOB_CATEGORIES[query.data]}')
+
+        keyboard = []
+        for category in JOB_CATEGORIES:
+            keyboard.append([InlineKeyboardButton(JOB_CATEGORIES[category], callback_data=category)])
+        keyboard.append([InlineKeyboardButton(SUBMIT_CATEGORY_BUTTON, callback_data=SUBMIT_CATEGORY_BUTTON)])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.bot.edit_message_reply_markup(
+            chat_id=update.callback_query.message.chat.id,
+            message_id=update.callback_query.message.message_id, 
+            reply_markup=reply_markup
+        )
+        return SAVE_JOB_SEARCH_APPLICATION
+
+
+def job_search_save_application(update, context, query):
     context.user_data['user_data']['job_category'] = update.effective_message.text
     context.user_data['user_data']['timestamp'] = dt.utcnow().replace(tzinfo=amsterdam_timezone)
 
@@ -129,10 +224,20 @@ def job_search_save_application(update, context):
         job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
         dbservice.update_user_data(update.message, {field: context.user_data['user_data'][field]})
 
-    update.message.reply_text(responses["JOB_SEARCH_SUMMARY"])
-    update.message.reply_text(job_applicant_summary)
-    update.message.reply_text(responses["JOB_SEARCH_END"], reply_markup=menu_kb)
-
+    context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=responses["JOB_SEARCH_SUMMARY"])
+    context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=job_applicant_summary)
+    context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=responses["JOB_SEARCH_END"], 
+        reply_markup=menu_kb)
+    context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
     return WELCOME
 
 def _create_user_data_object(update, context):
@@ -238,11 +343,23 @@ def parse_photo_command(update: Update, context) -> None:
 
 
 def help_command(update, context):
-    update.message.reply_text("Use /start to test this bot.")
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text="Use /start to test this bot.")
+    context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id
+        )
 
 
 def free_input_command(update, context):
-    update.message.reply_text("Sorry, I didn't undersrtand what you said. Try using one of our commands", reply_markup=menu_kb)
+    context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text="Sorry, I didn't undersrtand what you said. Try using one of our commands", reply_markup=menu_kb)
+    context.bot.delete_message(
+            chat_id=update.message.chat_id,
+            message_id=update.message.message_id
+        )
 
 
 def error(update, context):
@@ -271,7 +388,9 @@ def main():
                 MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode)
             ],
             AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories)],
-            SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
+            SAVE_JOB_SEARCH_APPLICATION: [
+                CallbackQueryHandler(keyboard_callback)
+                ],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),
               MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_link)
