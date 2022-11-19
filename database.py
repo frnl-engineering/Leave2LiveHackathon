@@ -59,6 +59,21 @@ class DBService:
             print(error)
             return False
 
+    def update_user_data(self, message, update_dict):
+        try:
+            self._users_collection.update_one(
+                {
+                    '_id': message.from_user.id
+                },
+                {
+                     '$set': { **update_dict }
+                }
+            )
+            return True
+
+        except Exception as error:
+            print(error)
+
     def get_all_users_data(self):
         """
         return users list with all data from collection[users]
@@ -152,5 +167,3 @@ class DBService:
         except Exception as error:
             print(error)
 
-
-dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))

@@ -11,6 +11,8 @@ from datetime import datetime as dt
 import db_service
 from google_map_class import GoogleMapsClass
 
+from db_service import DBService 
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -47,6 +49,8 @@ NO_BUTTON = "❌ No"
 
 menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
+dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
+
 def start_command(update, context):
     logger.info('%s: start_command' % update.message.from_user['id'])
     update.message.reply_text(
@@ -58,6 +62,7 @@ def start_command(update, context):
 def job_search_ask_name(update, context):
     logger.info('%s: job_search_ask_name' % update.message.from_user['id'])
     _create_user_data_object(update, context)
+    dbservice.register_user(update.message)
     update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
     return AWAITING_JOB_APPLICANT_NAME
 
@@ -107,6 +112,7 @@ def job_search_save_application(update, context):
     job_applicant_summary = responses["JOB_APPLICANT_SUMMARY"]
     for field in ['first_name', 'city', 'speak_english']:
         job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
+        dbservice.update_user_data(update.message, {field: context.user_data['user_data'][field]})
     update.message.reply_text(responses["JOB_SEARCH_SUMMARY"])
     update.message.reply_text(job_applicant_summary)
     update.message.reply_text(responses["JOB_SEARCH_END"], reply_markup=menu_kb)
