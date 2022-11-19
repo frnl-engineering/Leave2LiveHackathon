@@ -101,10 +101,6 @@ class DBService:
         """
         return user data by user id
         """
-        if user_id != 1:
-            return {
-                "city": "test",
-            }
         try:
             return self._users_collection.find_one({"_id": user_id})
         except Exception as error:
@@ -133,7 +129,22 @@ class DBService:
         insert job to collection[jobs]
         """
         try:
-            self._jobs_collection.insert_one(job)
+            self._jobs_collection.insert_one(
+                {
+                    "_id": job["id"],
+                    "title": job["title"],
+                    "company": job["company"],
+                    "description": job["description"],
+                    "link": job["link"],
+                    "category": job["category"],
+                    "city": job["city"],
+                    "salary": job["salary"],
+                    "created_at": job["created_at"],
+                    "updated_at": job["updated_at"],
+                    "languages": job["languages"],
+                    "status": job["status"],
+                }
+            )
         except Exception as error:
             print(error)
 
@@ -141,28 +152,16 @@ class DBService:
         """
         return list of jobs that match user filter: city, job_type, salary
         """
-        if user_filter["city"] == "test":
-            return [
-                {"job_type": "Cook", "location": "Almelo, Netherlands", "distance": "21 km", "company": "McDonalds",
-                 "salary": "€ 2000",
-                 "link": "https://www.mcdonalds.com/nl/nl-nl.html"},
-                {"job_type": "Assistant cook", "location": "Hengelo, Netherlands", "distance": "9 km",
-                 "company": "McDonalds",
-                 "salary": "€ 2000",
-                 "link": "https://www.mcdonalds.com/nl/nl-nl.html"},
-                {"job_type": "Waiter/Waitress", "location": "Deventer, Netherlands", "distance": "36 km",
-                 "company": "Bird",
-                 "salary": "€ 2000",
-                 "link": "https://deventer-bird.com"},
-            ]
+        # By default return all active jobs
+        filter = {"status": "active"}
 
+        # And add user filters if they were defined
+        if user_filter.get("city"):
+            filter["city"] = user_filter["city"]
+        if user_filter.get("category"):
+            filter["category"] = user_filter["job_category"]
         try:
-            return list(self._jobs_collection.find({
-                "job_category": user_filter.job_category,
-                "salary": {"$gte": user_filter.min_salary},
-                "city": user_filter.city,
-                "status": "active",
-            }))
+            return list(self._jobs_collection.find(filter))
 
         except Exception as error:
             print(error)

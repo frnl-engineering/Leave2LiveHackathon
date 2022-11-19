@@ -7,11 +7,9 @@ import datetime
 
 import pytz
 from datetime import datetime as dt
-
-import db_service
 from google_map_class import GoogleMapsClass
 
-from db_service import DBService 
+from database import DBService
 
 from dotenv import load_dotenv
 
@@ -160,17 +158,22 @@ def image_handler(update, context):
 
 
 def notify(context) -> None:
-    chat_id = context.job.context
+    chat_id = context.job.context['chat_id']
+    user_id = context.job.context['user_id']
     # job_industry = "Cafe and restaurants"
     # location = "Enschede, Netherlands"
 
-    user_filter = db_service.dbservice.get_user_data(user_id=chat_id)
-    jobs_details = db_service.dbservice.get_jobs_by_user_filter(user_filter=user_filter)
+    user_filter = dbservice.get_user_data(user_id=user_id)
+    jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter)
+
+    if not jobs_details:
+        context.bot.send_message(chat_id=chat_id, text="Hi, no jobs found today")
+        return
 
     message = "Hi, today we found {0} job(s) for you:\n".format(len(jobs_details))
     for job in jobs_details:
-        message += "Job type: {0}\nLocation: {1}\nDistance: {2}\nCompany: {3}\nSalary: {4}\nLink: {5}\n\n".format(
-            job["job_type"], job["location"], job["distance"], job["company"], job["salary"], job["link"])
+        message += "Job title: {0}\nCity: {1}\nCompany: {2}\nSalary per hour: {3}\nLink: {4}\n\n".format(
+            job["title"], job["city"], job["company"], job["salary"], job["link"])
 
     logger.info("Notification to %s", chat_id)
 
@@ -181,11 +184,12 @@ def parse_photo_command(update: Update, context) -> None:
     update.message.reply_text(
         "Please parse this photo",
         reply_markup=menu_kb
-        )
+    )
 
     chat_id = update.effective_chat.id
     ten_minutes = 5  # 60 * 10 # 10 minutes in seconds
-    context.job_queue.run_once(callback=notify, when=ten_minutes, context=chat_id)
+    job_context = {"user_id": update.message.from_user.id, "chat_id": chat_id}
+    context.job_queue.run_once(callback=notify, when=ten_minutes, context=job_context)
     # Whatever you pass here as context is available in the job.context variable of the callback
 
 
