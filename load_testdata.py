@@ -1,6 +1,9 @@
-from database import dbservice
+import os
+from database import DBService
 from datetime import datetime as dt
 import uuid
+
+dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
 
 
 def load():

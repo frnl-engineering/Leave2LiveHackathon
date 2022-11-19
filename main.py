@@ -7,11 +7,9 @@ import datetime
 
 import pytz
 from datetime import datetime as dt
-
-from database import dbservice
 from google_map_class import GoogleMapsClass
 
-from db_service import DBService 
+from database import DBService
 
 from dotenv import load_dotenv
 
