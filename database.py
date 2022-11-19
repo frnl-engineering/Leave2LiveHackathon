@@ -1,3 +1,6 @@
+import uuid
+from datetime import datetime
+
 import pymongo
 import os
 
@@ -16,6 +19,7 @@ class DBService:
         self._users_collection = self._db["users"]
         self._media_collection = self._db["media"]
         self._jobs_collection = self._db["jobs"]
+        self._jobs_to_validate_collection = self._db["jobs_to_validate"]
 
         self._db_name = db_name
 
@@ -106,16 +110,16 @@ class DBService:
         except Exception as error:
             print(error)
 
-    def save_image_uri(self, image_uri, user_id):
+    def save_media_uri(self, image_uri, message):
         try:
             if (
                 self._media_collection.count_documents({"uri": image_uri})
                 == 0
             ):
-                self._users_collection.insert_one(
+                self._media_collection.insert_one(
                     {
                         "uri": image_uri,
-                        "user_id": user_id,
+                        "user_id": message.from_user.id,
                     }
                 )
             return True
@@ -123,6 +127,12 @@ class DBService:
         except Exception as error:
             print(error)
             return False
+
+    def get_all_media_uris(self):
+        try:
+            return list(self._media_collection.find())
+        except Exception as error:
+            print(error)
 
     def insert_job(self, job):
         """
@@ -145,6 +155,25 @@ class DBService:
                     "status": job["status"],
                 }
             )
+        except Exception as error:
+            print(error)
+
+    def insert_raw_job(self, raw_job: dict):
+        try:
+            self._jobs_to_validate_collection.insert_one(
+                {
+                    "_id": str(uuid.uuid4()),
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    **raw_job,
+                }
+            )
+        except Exception as error:
+            print(error)
+
+    def get_all_raw_jobs(self):
+        try:
+            return list(self._jobs_to_validate_collection.find())
         except Exception as error:
             print(error)
 
