@@ -1,0 +1,11 @@
+{
+    "WELCOME_MESSAGE": "'Hi! This bot is created to help people who fled war find job in the Netherlands. What would you like to do?",
+    "JOB_SEARCH_ASK_NAME": "Let's help you find a job. First, how should I call you?",
+    "JOB_SEARCH_ASK_POSTCODE": "We'll need postcode in the '1234 AB' format to know where you are looking for a job. What is your Dutch postcode?",
+    "JOB_SEARCH_ASK_LANGUAGE": "Thanks. Do you speak English?",
+    "JOB_SEARCH_SUMMARY": "We have saved the following info about you:",
+    "JOB_SEARCH_END": "We'll let you know with a pus notification once we get jobs in your city. What do you want to do now?",
+    "WRONG_POSTCODE": "We cannot find the index you entered. It is supposed to be of format '1234 AB'. Please, try again. What is your postcode in the Netherlands?",
+    "JOB_APPLICANT_SUMMARY": "🧍 Name: {first_name} \n\n\uD83D\uDCCD City: {city} \n\n\uD83D\uDCCA Category: {job_type} \n\n🇬🇧 English knowledge: {speak_english}",
+    "ADDRESS_SUMMARY": "\uD83C\uDFE0 City: {city} \n\n\uD83D\uDCCA Postcode: {formatted_postcode} \n\n Is everything correct?"
+}

@@ -2,3 +2,4 @@ python-telegram-bot==13.14
 python-dotenv
 requests
 pytz
+googlemaps==4.6.0
