@@ -62,7 +62,6 @@ def job_search_ask_name(update, context):
 
 def job_search_ask_postcode(update, context):
     logger.info('%s: job_search_ask_postcode' % update.message.from_user['id'])
-    dbservice.update_user_data(update.message)
     context.user_data['user_data']['first_name'] = update.effective_message.text
     update.message.reply_text(responses["JOB_SEARCH_ASK_POSTCODE"])
     return AWAITING_JOB_APPLICANT_POSTCODE
@@ -107,6 +106,7 @@ def job_search_save_application(update, context):
     job_applicant_summary = responses["JOB_APPLICANT_SUMMARY"]
     for field in ['first_name', 'city', 'speak_english']:
         job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
+        dbservice.update_user_data(update.message, {field: context.user_data['user_data'][field]})
     update.message.reply_text(responses["JOB_SEARCH_SUMMARY"])
     update.message.reply_text(job_applicant_summary)
     update.message.reply_text(responses["JOB_SEARCH_END"], reply_markup=menu_kb)

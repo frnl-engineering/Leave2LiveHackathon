@@ -57,20 +57,15 @@ class DBService:
             print(error)
             return False
 
-    def update_user_data(self, message):
+    def update_user_data(self, message, update_dict):
         try:
             self._users_collection.update_one(
                 {
                     '_id': message.from_user.id
                 },
                 {
-                     '$set': {
-                        'username': 'tested',
-                        'new_field': '2',
-                        'list_field': [],
-                        }
-                }, 
-                upsert=False, multi=False
+                     '$set': { **update_dict }
+                }
             )
             return True
 
