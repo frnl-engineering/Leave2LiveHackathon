@@ -44,7 +44,7 @@ SUBMIT_LINK_FLOW = 9
 AWAITING_JOB_APPLICANT_LANGUAGE = 10
 
 JOB_SEARCH_BUTTON = "💼 Find job"
-SUBMIT_PHOTO_BUTTON = "📸 Submit job"
+SUBMIT_JOB_BUTTON = "📸 Submit job"
 PARSE_PHOTO_BUTTON = "📝 Parse photo"
 RESTART_BUTTON = "🔄 Restart"
 YES_BUTTON = "✅ Yes"
@@ -56,7 +56,7 @@ WAITER_BUTTON = "💁 Waiter / hostess"
 HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
 
 
-menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_JOB_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
 dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
 
@@ -74,6 +74,7 @@ def job_search_ask_name(update, context):
     dbservice.register_user(update.message)
     update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
     return AWAITING_JOB_APPLICANT_NAME
+
 
 def job_search_ask_postcode(update, context):
     logger.info('%s: job_search_ask_postcode' % update.message.from_user['id'])
@@ -178,25 +179,48 @@ def submit_photo(update, context):
     return SUBMIT_PHOTO_FLOW
 
 
-def submit_link(update, context):
+def submit_job_text_link(update, context):
     update.message.reply_text(
         responses["SUBMIT_LINK"]
     )
     return SUBMIT_LINK_FLOW
 
-def image_handler(update, context):
-    msg_file = update.message.photo[0].file_id
-    obj = context.bot.get_file(msg_file)
-    if not os.path.exists("media/"):
-        os.makedirs("media/")
-    file_uri = f"media/{str(uuid.uuid4())}.jpg"
-    obj.download(file_uri)
 
-    update.message.reply_text("Image received", reply_markup=menu_kb)
+def image_handler(update, context):
+    # TODO make transaction atomic
+    try:
+        msg_file = update.message.photo[0].file_id
+        file_obj = context.bot.get_file(msg_file)
+        if not os.path.exists("media/"):
+            os.makedirs("media/")
+        file_uri = f"media/{str(uuid.uuid4())}.jpg"
+        file_obj.download(file_uri)
+        dbservice.save_media_uri(message=update.message, image_uri=file_uri)
+        raw_job = {
+            "description": update.message.caption,
+            "file_uri": file_uri,
+            "checked": False,
+            "created_by": update.message.from_user.id,
+            "checked_by": None,
+        }
+        dbservice.insert_raw_job(raw_job)
+        update.message.reply_text("Image received", reply_markup=menu_kb)
+    except Exception as e:
+        print(e)
+        update.message.reply_text("Something went wrong, please try again later", reply_markup=menu_kb)
+        return WELCOME
     return WELCOME
 
-def link_handler(update, context):
-    # todo: XXX
+
+def submit_job_text_handler(update, context):
+    raw_job = {
+        "description": update.message.text,
+        "file_uri": None,
+        "checked": False,
+        "created_by": update.message.from_user.id,
+        "checked_by": None,
+    }
+    dbservice.insert_raw_job(raw_job)
     update.message.reply_text("Text received", reply_markup=menu_kb)
     return WELCOME
 
@@ -260,7 +284,7 @@ def main():
       states={
             WELCOME: [
                 MessageHandler(filters=Filters.text(JOB_SEARCH_BUTTON), callback=job_search_ask_name),
-                MessageHandler(filters=Filters.text(SUBMIT_PHOTO_BUTTON), callback=submit_job_command),
+                MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command),
                 MessageHandler(filters=Filters.text(PARSE_PHOTO_BUTTON), callback=parse_photo_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command),
                 ],
@@ -274,13 +298,13 @@ def main():
             SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),
-              MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_link)
+              MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_job_text_link)
             ],
             SUBMIT_PHOTO_FLOW: [
                 MessageHandler(filters=Filters.photo, callback=image_handler)
             ],
             SUBMIT_LINK_FLOW: [
-                MessageHandler(filters=None, callback=link_handler)  # todo: update callback
+                MessageHandler(filters=None, callback=submit_job_text_handler)  # todo: update callback
             ]
       },
       fallbacks=[MessageHandler(Filters.text, free_input_command)],
