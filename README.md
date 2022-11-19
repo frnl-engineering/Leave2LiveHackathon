@@ -9,3 +9,11 @@ conda activate l2l
 pip install -r requirements.txt
 
 ```
+
+### 2. Create .env file
+```
+API_KEY=<BOTFATHER_TOKEN>
+GM_API_KEY=<GOOGLE_API_KEY>
+DB_URI=<MONGO_URL>
+DB_NAME=<DB_NAME>
+```
