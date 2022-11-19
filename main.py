@@ -2,6 +2,9 @@ import os
 import json
 import logging
 
+import uuid
+import datetime
+
 import pytz
 from datetime import datetime as dt
 
@@ -44,7 +47,7 @@ menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PH
 def start_command(update, context):
     logger.info('%s: start_command' % update.message.from_user['id'])
     update.message.reply_text(
-        responses["WELCOME_MESSAGE"], 
+        responses["WELCOME_MESSAGE"],
         reply_markup=menu_kb
         )
     return WELCOME
@@ -81,7 +84,7 @@ def job_search_confirm_postcode(update, context):
 
     else:
         update.message.reply_text(
-            address_summary, 
+            address_summary,
             reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON]], one_time_keyboard=True)
         )
         return CONFIRM_JOB_APPLICANT_POSTCODE
@@ -89,7 +92,7 @@ def job_search_confirm_postcode(update, context):
 
 def job_search_ask_language(update, context):
     update.message.reply_text(
-        responses["JOB_SEARCH_ASK_LANGUAGE"], 
+        responses["JOB_SEARCH_ASK_LANGUAGE"],
         reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON]], one_time_keyboard=True)
         )
     return SAVE_JOB_SEARCH_APPLICATION
@@ -126,17 +129,33 @@ def _create_user_data_object(update, context):
 
     context.user_data['user_data']['username'] = user_data['username']
 
+
 def submit_photo_command(update, context):
     update.message.reply_text(
         "Please sumbit your photo", 
         reply_markup=menu_kb
         )
+    return SUBMIT_PHOTO_FLOW
+
+
+def image_handler(update, context):
+    msg_file = update.message.photo[0].file_id
+    obj = context.bot.get_file(msg_file)
+    if not os.path.exists("media/"):
+        os.makedirs("media/")
+    file_uri = f"media/{str(uuid.uuid4())}.jpg"
+    obj.download(file_uri)
+
+    update.message.reply_text("Image received", reply_markup=menu_kb)
+    return WELCOME
+
 
 def parse_photo_command(update, context):
     update.message.reply_text(
         "Please parse this photo", 
         reply_markup=menu_kb
         )
+
 
 def help_command(update, context):
     update.message.reply_text("Use /start to test this bot.")
@@ -172,6 +191,9 @@ def main():
                 MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode)
             ],
             SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
+            SUBMIT_PHOTO_FLOW: [
+              MessageHandler(filters=Filters.photo, callback=image_handler)
+            ],
       },
       fallbacks=[MessageHandler(Filters.text, free_input_command)],
       )
@@ -182,6 +204,7 @@ def main():
 
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == "__main__":
     main()
