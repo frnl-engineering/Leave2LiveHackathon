@@ -8,10 +8,9 @@ import datetime
 import pytz
 from datetime import datetime as dt
 
-import db_service
 from google_map_class import GoogleMapsClass
 
-from db_service import DBService 
+from database import DBService 
 
 from dotenv import load_dotenv
 
@@ -46,6 +45,8 @@ PARSE_PHOTO_BUTTON = "📝 Parse photo"
 RESTART_BUTTON = "🔄 Restart"
 YES_BUTTON = "✅ Yes"
 NO_BUTTON = "❌ No"
+UPLOAD_PHOTO_BUTTON = "Upload photo"
+SHARE_LINK_BUTTON = "Share a link"
 
 menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
@@ -141,9 +142,15 @@ def _create_user_data_object(update, context):
 
 def submit_photo_command(update, context):
     update.message.reply_text(
-        "Please sumbit your photo",
-        reply_markup=menu_kb
+        responses["SUBMIT_PHOTO_MESSAGE_1"]
         )
+    update.message.reply_text(
+        responses["SUBMIT_PHOTO_MESSAGE_2"]
+        )
+    update.message.reply_text(
+        responses["SUBMIT_PHOTO_MESSAGE_3"],
+        reply_markup=ReplyKeyboardMarkup([[UPLOAD_PHOTO_BUTTON, SHARE_LINK_BUTTON]], one_time_keyboard=True)
+    )
     return SUBMIT_PHOTO_FLOW
 
 
@@ -164,8 +171,8 @@ def notify(context) -> None:
     # job_industry = "Cafe and restaurants"
     # location = "Enschede, Netherlands"
 
-    user_filter = db_service.dbservice.get_user_data(user_id=chat_id)
-    jobs_details = db_service.dbservice.get_jobs_by_user_filter(user_filter=user_filter)
+    user_filter = dbservice.get_user_data(user_id=chat_id)
+    jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter)
 
     message = "Hi, today we found {0} job(s) for you:\n".format(len(jobs_details))
     for job in jobs_details:
@@ -231,6 +238,7 @@ def main():
       )
 
     updater.dispatcher.add_handler(handler)
+    updater.dispatcher.add_handler(CommandHandler('start', start_command))
 
     dp.add_error_handler(error)
 
