@@ -87,10 +87,9 @@ def job_search_confirm_postcode(update, context):
             context.user_data['user_data'][info] = found_addresses[0][info]
             logger.info(f"{update.message.from_user['id']}: {info} was set to {found_addresses[0][info]}")
         address_summary = responses["ADDRESS_SUMMARY"]
-        for field in ['city', 'formatted_postcode']:
-            address_summary = address_summary.replace('{' + field + '}', context.user_data['user_data'][field])
+        address_summary = address_summary.replace('{city}', context.user_data['user_data']['city'])
 
-    if not postcode_is_correct:
+    if not postcode_is_correct or not address_summary:
         update.message.reply_text(responses["WRONG_POSTCODE"])
         return AWAITING_JOB_APPLICANT_POSTCODE
 
