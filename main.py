@@ -8,13 +8,16 @@ import datetime
 import pytz
 from datetime import datetime as dt
 
+import db_service
 from google_map_class import GoogleMapsClass
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from telegram import ReplyKeyboardMarkup
-from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence
+from telegram import ReplyKeyboardMarkup, Update
+from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
+    ContextTypes
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -132,7 +135,7 @@ def _create_user_data_object(update, context):
 
 def submit_photo_command(update, context):
     update.message.reply_text(
-        "Please sumbit your photo", 
+        "Please sumbit your photo",
         reply_markup=menu_kb
         )
     return SUBMIT_PHOTO_FLOW
@@ -150,11 +153,34 @@ def image_handler(update, context):
     return WELCOME
 
 
-def parse_photo_command(update, context):
+def notify(context) -> None:
+    chat_id = context.job.context
+    # job_industry = "Cafe and restaurants"
+    # location = "Enschede, Netherlands"
+
+    user_filter = db_service.dbservice.get_user_data(user_id=chat_id)
+    jobs_details = db_service.dbservice.get_jobs_by_user_filter(user_filter=user_filter)
+
+    message = "Hi, today we found {0} job(s) for you:\n".format(len(jobs_details))
+    for job in jobs_details:
+        message += "Job type: {0}\nLocation: {1}\nDistance: {2}\nCompany: {3}\nSalary: {4}\nLink: {5}\n\n".format(
+            job["job_type"], job["location"], job["distance"], job["company"], job["salary"], job["link"])
+
+    logger.info("Notification to %s", chat_id)
+
+    context.bot.send_message(chat_id=chat_id, text=message)
+
+
+def parse_photo_command(update: Update, context) -> None:
     update.message.reply_text(
-        "Please parse this photo", 
+        "Please parse this photo",
         reply_markup=menu_kb
         )
+
+    chat_id = update.effective_chat.id
+    ten_minutes = 5  # 60 * 10 # 10 minutes in seconds
+    context.job_queue.run_once(callback=notify, when=ten_minutes, context=chat_id)
+    # Whatever you pass here as context is available in the job.context variable of the callback
 
 
 def help_command(update, context):

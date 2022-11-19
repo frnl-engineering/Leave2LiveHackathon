@@ -15,6 +15,7 @@ class DBService:
 
         self._users_collection = self._db["users"]
         self._media_collection = self._db["media"]
+        self._jobs_collection = self._db["jobs"]
 
         self._db_name = db_name
 
@@ -81,6 +82,19 @@ class DBService:
         except Exception as error:
             print(error)
 
+    def get_user_data(self, user_id):
+        """
+        return user data by user id
+        """
+        if user_id != 1:
+            return {
+                "city": "test",
+            }
+        try:
+            return self._users_collection.find_one({"_id": user_id})
+        except Exception as error:
+            print(error)
+
     def save_image_uri(self, image_uri, user_id):
         try:
             if (
@@ -98,6 +112,45 @@ class DBService:
         except Exception as error:
             print(error)
             return False
+
+    def insert_job(self, job):
+        """
+        insert job to collection[jobs]
+        """
+        try:
+            self._jobs_collection.insert_one(job)
+        except Exception as error:
+            print(error)
+
+    def get_jobs_by_user_filter(self, user_filter):
+        """
+        return list of jobs that match user filter: city, job_type, salary
+        """
+        if user_filter["city"] == "test":
+            return [
+                {"job_type": "Cook", "location": "Almelo, Netherlands", "distance": "21 km", "company": "McDonalds",
+                 "salary": "€ 2000",
+                 "link": "https://www.mcdonalds.com/nl/nl-nl.html"},
+                {"job_type": "Assistant cook", "location": "Hengelo, Netherlands", "distance": "9 km",
+                 "company": "McDonalds",
+                 "salary": "€ 2000",
+                 "link": "https://www.mcdonalds.com/nl/nl-nl.html"},
+                {"job_type": "Waiter/Waitress", "location": "Deventer, Netherlands", "distance": "36 km",
+                 "company": "Bird",
+                 "salary": "€ 2000",
+                 "link": "https://deventer-bird.com"},
+            ]
+
+        try:
+            return list(self._jobs_collection.find({
+                "job_category": user_filter.job_category,
+                "salary": {"$gte": user_filter.min_salary},
+                "city": user_filter.city,
+                "status": "active",
+            }))
+
+        except Exception as error:
+            print(error)
 
 
 dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
