@@ -2,18 +2,24 @@ import os
 import json
 import logging
 
+import uuid
+import datetime
+
 import pytz
 from datetime import datetime as dt
 
+import db_service
 from google_map_class import GoogleMapsClass
 
 from db_service import DBService 
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from telegram import ReplyKeyboardMarkup
-from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence
+from telegram import ReplyKeyboardMarkup, Update
+from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
+    ContextTypes
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,7 +54,7 @@ dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv(
 def start_command(update, context):
     logger.info('%s: start_command' % update.message.from_user['id'])
     update.message.reply_text(
-        responses["WELCOME_MESSAGE"], 
+        responses["WELCOME_MESSAGE"],
         reply_markup=menu_kb
         )
     return WELCOME
@@ -86,7 +92,7 @@ def job_search_confirm_postcode(update, context):
 
     else:
         update.message.reply_text(
-            address_summary, 
+            address_summary,
             reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON]], one_time_keyboard=True)
         )
         return CONFIRM_JOB_APPLICANT_POSTCODE
@@ -94,7 +100,7 @@ def job_search_confirm_postcode(update, context):
 
 def job_search_ask_language(update, context):
     update.message.reply_text(
-        responses["JOB_SEARCH_ASK_LANGUAGE"], 
+        responses["JOB_SEARCH_ASK_LANGUAGE"],
         reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON]], one_time_keyboard=True)
         )
     return SAVE_JOB_SEARCH_APPLICATION
@@ -132,17 +138,56 @@ def _create_user_data_object(update, context):
 
     context.user_data['user_data']['username'] = user_data['username']
 
+
 def submit_photo_command(update, context):
     update.message.reply_text(
-        "Please sumbit your photo", 
+        "Please sumbit your photo",
+        reply_markup=menu_kb
+        )
+    return SUBMIT_PHOTO_FLOW
+
+
+def image_handler(update, context):
+    msg_file = update.message.photo[0].file_id
+    obj = context.bot.get_file(msg_file)
+    if not os.path.exists("media/"):
+        os.makedirs("media/")
+    file_uri = f"media/{str(uuid.uuid4())}.jpg"
+    obj.download(file_uri)
+
+    update.message.reply_text("Image received", reply_markup=menu_kb)
+    return WELCOME
+
+
+def notify(context) -> None:
+    chat_id = context.job.context
+    # job_industry = "Cafe and restaurants"
+    # location = "Enschede, Netherlands"
+
+    user_filter = db_service.dbservice.get_user_data(user_id=chat_id)
+    jobs_details = db_service.dbservice.get_jobs_by_user_filter(user_filter=user_filter)
+
+    message = "Hi, today we found {0} job(s) for you:\n".format(len(jobs_details))
+    for job in jobs_details:
+        message += "Job type: {0}\nLocation: {1}\nDistance: {2}\nCompany: {3}\nSalary: {4}\nLink: {5}\n\n".format(
+            job["job_type"], job["location"], job["distance"], job["company"], job["salary"], job["link"])
+
+    logger.info("Notification to %s", chat_id)
+
+    context.bot.send_message(chat_id=chat_id, text=message)
+
+
+def parse_photo_command(update: Update, context) -> None:
+    update.message.reply_text(
+        "Please parse this photo",
         reply_markup=menu_kb
         )
 
-def parse_photo_command(update, context):
-    update.message.reply_text(
-        "Please parse this photo", 
-        reply_markup=menu_kb
-        )
+    chat_id = update.effective_chat.id
+    ten_minutes = 5  # 60 * 10 # 10 minutes in seconds
+    context.job_queue.run_once(callback=notify, when=ten_minutes, context=chat_id)
+    # Whatever you pass here as context is available in the job.context variable of the callback
+
 
 def help_command(update, context):
     update.message.reply_text("Use /start to test this bot.")
@@ -178,6 +223,9 @@ def main():
                 MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode)
             ],
             SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
+            SUBMIT_PHOTO_FLOW: [
+              MessageHandler(filters=Filters.photo, callback=image_handler)
+            ],
       },
       fallbacks=[MessageHandler(Filters.text, free_input_command)],
       )
@@ -188,6 +236,7 @@ def main():
 
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == "__main__":
     main()
