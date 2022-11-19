@@ -7,6 +7,8 @@ from datetime import datetime as dt
 
 from google_map_class import GoogleMapsClass
 
+from db_service import DBService 
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -41,6 +43,8 @@ NO_BUTTON = "❌ No"
 
 menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
+dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
+
 def start_command(update, context):
     logger.info('%s: start_command' % update.message.from_user['id'])
     update.message.reply_text(
@@ -52,11 +56,13 @@ def start_command(update, context):
 def job_search_ask_name(update, context):
     logger.info('%s: job_search_ask_name' % update.message.from_user['id'])
     _create_user_data_object(update, context)
+    dbservice.register_user(update.message)
     update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
     return AWAITING_JOB_APPLICANT_NAME
 
 def job_search_ask_postcode(update, context):
     logger.info('%s: job_search_ask_postcode' % update.message.from_user['id'])
+    dbservice.update_user_data(update.message)
     context.user_data['user_data']['first_name'] = update.effective_message.text
     update.message.reply_text(responses["JOB_SEARCH_ASK_POSTCODE"])
     return AWAITING_JOB_APPLICANT_POSTCODE
