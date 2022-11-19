@@ -1,5 +1,5 @@
 {
-    "WELCOME_MESSAGE": "'Hi! This bot is created to help people who fled war find job in the Netherlands. What would you like to do?",
+    "WELCOME_MESSAGE": "Hi! This bot is created to help people who fled war find job in the Netherlands. What would you like to do?",
     "JOB_SEARCH_ASK_NAME": "Let's help you find a job. First, how should I call you?",
     "JOB_SEARCH_ASK_POSTCODE": "We'll need postcode in the '1234 AB' format to know where you are looking for a job. What is your Dutch postcode?",
     "JOB_SEARCH_ASK_LANGUAGE": "Thanks. Do you speak English?",
