@@ -14,6 +14,7 @@ class DBService:
         self._db = self._cluster[db_name]
 
         self._users_collection = self._db["users"]
+        self._media_collection = self._db["media"]
 
         self._db_name = db_name
 
@@ -79,6 +80,24 @@ class DBService:
 
         except Exception as error:
             print(error)
+
+    def save_image_uri(self, image_uri, user_id):
+        try:
+            if (
+                self._media_collection.count_documents({"uri": image_uri})
+                == 0
+            ):
+                self._users_collection.insert_one(
+                    {
+                        "uri": image_uri,
+                        "user_id": user_id,
+                    }
+                )
+            return True
+
+        except Exception as error:
+            print(error)
+            return False
 
 
 dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
