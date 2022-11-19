@@ -41,6 +41,7 @@ CONFIRM_JOB_APPLICANT_POSTCODE = 6
 SAVE_JOB_SEARCH_APPLICATION = 7
 SUBMIT_PHOTO_FLOW = 8
 SUBMIT_LINK_FLOW = 9
+AWAITING_JOB_APPLICANT_LANGUAGE = 10
 
 JOB_SEARCH_BUTTON = "💼 Find job"
 SUBMIT_PHOTO_BUTTON = "📸 Submit job"
@@ -50,6 +51,10 @@ YES_BUTTON = "✅ Yes"
 NO_BUTTON = "❌ No"
 UPLOAD_PHOTO_BUTTON = "📸 Upload photo"
 SHARE_LINK_BUTTON = "📝 Share a link/text"
+COURIER_BUTTON = "🚚 Courier"
+WAITER_BUTTON = "💁 Waiter / hostess"
+HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
+
 
 menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_PHOTO_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
@@ -96,29 +101,38 @@ def job_search_confirm_postcode(update, context):
     else:
         update.message.reply_text(
             address_summary,
-            reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON]], one_time_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
         return CONFIRM_JOB_APPLICANT_POSTCODE
-
 
 def job_search_ask_language(update, context):
     update.message.reply_text(
         responses["JOB_SEARCH_ASK_LANGUAGE"],
-        reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON]], one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+        )
+    return AWAITING_JOB_APPLICANT_LANGUAGE
+
+def job_search_ask_job_categories(update, context):
+    context.user_data['user_data']['speak_english'] = update.effective_message.text
+    update.message.reply_text(
+        responses["JOB_SEARCH_ASK_CATEGORIES"],
+        reply_markup=ReplyKeyboardMarkup([[COURIER_BUTTON, WAITER_BUTTON, HANDYMAN_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
     return SAVE_JOB_SEARCH_APPLICATION
 
 def job_search_save_application(update, context):
-    context.user_data['user_data']['speak_english'] = update.effective_message.text
+    context.user_data['user_data']['job_category'] = update.effective_message.text
     context.user_data['user_data']['timestamp'] = dt.utcnow().replace(tzinfo=amsterdam_timezone)
 
     job_applicant_summary = responses["JOB_APPLICANT_SUMMARY"]
-    for field in ['first_name', 'city', 'speak_english']:
+    for field in ['first_name', 'city', 'speak_english', 'job_category']:
         job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
         dbservice.update_user_data(update.message, {field: context.user_data['user_data'][field]})
+
     update.message.reply_text(responses["JOB_SEARCH_SUMMARY"])
     update.message.reply_text(job_applicant_summary)
     update.message.reply_text(responses["JOB_SEARCH_END"], reply_markup=menu_kb)
+
     return WELCOME
 
 def _create_user_data_object(update, context):
@@ -135,7 +149,8 @@ def _create_user_data_object(update, context):
             'city': None,
             'status': 'new',
             'timestamp': None,
-            'speak_english': None
+            'speak_english': None,
+            "job_category": None
         }
         logger.info('set default user data %s' % context.user_data['user_data'])
 
@@ -255,6 +270,7 @@ def main():
                 MessageHandler(filters=Filters.text(YES_BUTTON), callback=job_search_ask_language),
                 MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode)
             ],
+            AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories)],
             SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),
@@ -272,6 +288,7 @@ def main():
 
     updater.dispatcher.add_handler(handler)
     updater.dispatcher.add_handler(CommandHandler('start', start_command))
+    updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command))
 
     dp.add_error_handler(error)
 
