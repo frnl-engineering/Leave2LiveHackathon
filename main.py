@@ -6,7 +6,7 @@ import logging
 import uuid
 import datetime
 import random
-
+import base64
 import pytz
 from datetime import datetime as dt
 
@@ -56,6 +56,7 @@ AWAITING_JOB_PHOTO_CATEGOTY = 15
 
 JOB_SEARCH_BUTTON = "💼 Get a job"
 SUBSCRIBE_BUTTON = "🔔 Subscribe"
+UNSUBSCRIBE_BUTTON = "🔕 Unsubscribe"
 SUBMIT_JOB_BUTTON = "📸 Submit new vacancy"
 PARSE_PHOTO_BUTTON = "📝 Help by parsing job descriptions"
 RESTART_BUTTON = "🔄 Restart"
@@ -77,15 +78,22 @@ JOB_CATEGORIES = {
 }
 
 keyboard = [
-    [InlineKeyboardButton(JOB_CATEGORIES["COURIER_BUTTON"], callback_data='COURIER_BUTTON')], 
-    [InlineKeyboardButton(JOB_CATEGORIES["WAITER_BUTTON"], callback_data='WAITER_BUTTON')], 
-    [InlineKeyboardButton(JOB_CATEGORIES["HANDYMAN_BUTTON"], callback_data='HANDYMAN_BUTTON')], 
+    [InlineKeyboardButton(JOB_CATEGORIES["COURIER_BUTTON"], callback_data='COURIER_BUTTON')],
+    [InlineKeyboardButton(JOB_CATEGORIES["WAITER_BUTTON"], callback_data='WAITER_BUTTON')],
+    [InlineKeyboardButton(JOB_CATEGORIES["HANDYMAN_BUTTON"], callback_data='HANDYMAN_BUTTON')],
     [InlineKeyboardButton(SUBMIT_CATEGORY_BUTTON, callback_data=SUBMIT_CATEGORY_BUTTON)]]
 job_search_reply_markup = InlineKeyboardMarkup(keyboard)
 
+menu_kb_with_unsubscribe =  ReplyKeyboardMarkup([
+    [JOB_SEARCH_BUTTON, UNSUBSCRIBE_BUTTON],
+    [SUBMIT_JOB_BUTTON],
+    [PARSE_PHOTO_BUTTON],
+    [RESTART_BUTTON]
+], one_time_keyboard=True)
+
 menu_kb = ReplyKeyboardMarkup([
-    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON], 
-    [SUBMIT_JOB_BUTTON], 
+    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON],
+    [SUBMIT_JOB_BUTTON],
     [PARSE_PHOTO_BUTTON],
     [RESTART_BUTTON]
 ], one_time_keyboard=True)
@@ -192,7 +200,7 @@ def keyboard_callback(update, context):
 
         context.bot.edit_message_reply_markup(
             chat_id=update.callback_query.message.chat.id,
-            message_id=update.callback_query.message.message_id, 
+            message_id=update.callback_query.message.message_id,
             reply_markup=job_search_reply_markup
         )
         return SAVE_JOB_SEARCH_APPLICATION
@@ -388,8 +396,18 @@ def submit_job_text_link(update, context):
     return SUBMIT_LINK_FLOW
 
 
+def image_to_base64(file_uri):
+    try:
+        with open(file_uri, "rb") as imageFile:
+            return base64.b64encode(imageFile.read())
+    except Exception as e:
+        logger.error(e)
+        return None
+
+
 def image_handler(update, context):
     emit_metric(type="etc", action="image_handler")
+    description = ""
     # TODO make transaction atomic
     try:
         msg_file = update.message.photo[-1].file_id
@@ -402,11 +420,11 @@ def image_handler(update, context):
         description = "Image caption: {}".format(update.message.caption) if update.message.caption else ""
         text, lang = ocr.read_text_from_image_path(file_uri)
         if text:
-            description += "\n\nText from image: {0}".format(text)
+            description += "\n\nText from the image:\n{0}".format(text)
             translated_text = translate.translate(text)
             if translated_text:
-                description += "\n\nTranslated text from image: {0}".format(translated_text)
-
+                description += "\n\nTranslated text from the image:\n{0}".format(translated_text)
+        # image_base64 = image_to_base64(file_uri)
         dbservice.save_media_uri(message=update.message, image_uri=file_uri)
         raw_job = {
             "description": description,
@@ -415,9 +433,10 @@ def image_handler(update, context):
             "checked": False,
             "created_by": update.message.from_user.id,
             "checked_by": None,
+            # "image_base64": image_base64,
         }
         dbservice.insert_raw_job(raw_job)
-        update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!")
+        update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees! \n\n{0}".format(description))
     except Exception as e:
         print(e)
         update.message.reply_text("Something went wrong, please try again later.", reply_markup=menu_kb)
@@ -498,7 +517,7 @@ def notify_user_about_jobs(context: CallbackContext) -> None:
     context.bot.send_message(
         chat_id=chat_id,
         text=message,
-        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [SUBSCRIBE_BUTTON, RESTART_BUTTON]], one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [UNSUBSCRIBE_BUTTON, RESTART_BUTTON]], one_time_keyboard=True)
     )
 
 
@@ -525,7 +544,7 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(responses["UNSUBSCRIBE"], reply_markup=menu_kb)
         return
     emit_metric(type="user", action="subscribe")
-    update.message.reply_text(responses["SUBSCRIBE"], reply_markup=menu_kb)
+    update.message.reply_text(responses["SUBSCRIBE"], reply_markup=menu_kb_with_unsubscribe)
 
     two_minutes = 30  # each 30 seconds
     job_context = {"user_id": update.message.from_user.id, "chat_id": chat_id}
@@ -561,6 +580,7 @@ def main():
                 MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command),
                 MessageHandler(filters=Filters.text(PARSE_PHOTO_BUTTON), callback=parse_job_photo_title),
                 MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command),
+                MessageHandler(filters=Filters.text(UNSUBSCRIBE_BUTTON), callback=subscribe_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command),
                 ],
             AWAITING_JOB_APPLICANT_NAME: [MessageHandler(filters=None, callback=job_search_ask_postcode), CommandHandler('start', start_command)],
@@ -598,6 +618,7 @@ def main():
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(PARSE_PHOTO_BUTTON), callback=parse_job_photo_title))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command))
+    updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(UNSUBSCRIBE_BUTTON), callback=subscribe_command))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command))
 
     dp.add_error_handler(error)
