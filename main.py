@@ -5,6 +5,7 @@ import logging
 
 import uuid
 import datetime
+import random
 
 import pytz
 from datetime import datetime as dt
@@ -183,13 +184,25 @@ def _create_user_data_object(update, context):
 
 def parse_job_photo_title(update, context):
     # TODO: get random job from the database/load photo with category "for_parsing". In the end after submitting translation mark it as "parsed"
+    all_raw_jobs = dbservice.get_all_raw_jobs()
+    random_job = random.choice(all_raw_jobs)
+    context.user_data['current_job_to_parse_id'] = random_job["_id"]
     context.user_data['job_object'] = {}
     update.message.reply_text(
         responses["PARSE_PHOTO_INTRO"]
     )
-    update.message.reply_text(
-        "Random job text/photo"
-    )
+    if random_job['description']:
+        update.message.reply_text(
+            random_job['description']
+        )
+    else:
+        update.message.reply_text(
+            "Random job description"
+        )
+        # context.bot.send_photo(
+        #     chat_id=update.message.chat_id,
+        #     photo=open(random_job["file_uri"], 'rb')
+        # )
     update.message.reply_text(
         responses["PARSE_PHOTO_ASK_JOB_TITLE"]
         )
@@ -224,21 +237,23 @@ def parse_job_photo_category(update, context):
 def parse_job_photo_thanks(update, context):
     context.user_data['job_object']['category'] = update.effective_message.text
     dbservice.insert_job(
-    {
-        "id": str(uuid.uuid4()),
-        "title": context.user_data['job_object']['title'],
-        "company": context.user_data['job_object']['company'],
-        "description": "???",
-        "link": "???",
-        "category": context.user_data['job_object']['category'],
-        "city": context.user_data['job_object']['city'],
-        "salary": "???",
-        "created_at": dt.utcnow(),
-        "updated_at": dt.utcnow(),
-        "languages": ["English", "Dutch"],
-        "status": "active",
-    }
+        {
+            "id": str(uuid.uuid4()),
+            "title": context.user_data['job_object']['title'],
+            "company": context.user_data['job_object']['company'],
+            "description": "???",
+            "link": "???",
+            "category": context.user_data['job_object']['category'],
+            "city": context.user_data['job_object']['city'],
+            "salary": "???",
+            "created_at": dt.utcnow(),
+            "updated_at": dt.utcnow(),
+            "languages": ["English", "Dutch"],
+            "status": "active",
+        }
     )
+
+    dbservice.update_raw_job_data(context.user_data['current_job_to_parse_id'], update.message.from_user.id) 
 
     update.message.reply_text(
         responses["PARSE_PHOTO_THANKS"], reply_markup=menu_kb

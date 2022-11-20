@@ -173,7 +173,22 @@ class DBService:
 
     def get_all_raw_jobs(self):
         try:
-            return list(self._jobs_to_validate_collection.find())
+            return list(self._jobs_to_validate_collection.find()) # todo: only those with no checked_by field filled
+        except Exception as error:
+            print(error)
+
+    def update_raw_job_data(self, raw_job_id, user_id):
+        try:
+            self._jobs_to_validate_collection.update_one(
+                {
+                    '_id': raw_job_id
+                },
+                {
+                        '$set': { "checked_by": user_id}
+                }
+            )
+            return True
+
         except Exception as error:
             print(error)
 
