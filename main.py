@@ -10,6 +10,8 @@ import random
 import pytz
 from datetime import datetime as dt
 
+import ocr
+import translate
 from google_map_class import GoogleMapsClass
 
 from database import DBService
@@ -25,7 +27,7 @@ from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
     ContextTypes, CallbackContext
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s  - %(lineno)d  - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 gm = GoogleMapsClass()
@@ -307,15 +309,24 @@ def image_handler(update, context):
     emit_metric(type="etc", action="image_handler")
     # TODO make transaction atomic
     try:
-        msg_file = update.message.photo[0].file_id
+        msg_file = update.message.photo[-1].file_id
         file_obj = context.bot.get_file(msg_file)
         if not os.path.exists("media/"):
             os.makedirs("media/")
         file_uri = f"media/{str(uuid.uuid4())}.jpg"
         file_obj.download(file_uri)
+
+        description = "Image caption: {}".format(update.message.caption) if update.message.caption else ""
+        text, lang = ocr.read_text_from_image_path(file_uri)
+        if text:
+            description += "\n\nText from image: {0}".format(text)
+            translated_text = translate.translate(text)
+            if translated_text:
+                description += "\n\nTranslated text from image: {0}".format(translated_text)
+
         dbservice.save_media_uri(message=update.message, image_uri=file_uri)
         raw_job = {
-            "description": update.message.caption,
+            "description": description,
             "address": context.user_data['job_address'],
             "file_uri": file_uri,
             "checked": False,
@@ -366,7 +377,7 @@ def format_job(job={}) -> str:
         res += row_template.format(responses["JOB_CATEGORY"], job["category"])
     if job["link"]:
         res += row_template.format(responses["JOB_LINK"], job["link"])
-    if job["photo"]:
+    if job.get("photo"):
         res += row_template.format(responses["JOB_PHOTO"], job["photo"])
     if job["updated_at"]:
         res += row_template.format(responses["JOB_UPDATED_AT"], job["updated_at"].strftime(datetime_format))
@@ -397,14 +408,14 @@ def notify_user_about_jobs(context: CallbackContext) -> None:
     logger.info("Notification to %s", chat_id)
 
     pagination_buttons = []
-    if page > 0:
-        pagination_buttons.append(PREV_PAGE_BUTTON)
-    if page < math.ceil(total / limit) - 1:
-        pagination_buttons.append(NEXT_PAGE_BUTTON)
+    # if page > 0:
+    #     pagination_buttons.append(PREV_PAGE_BUTTON)
+    # if page < math.ceil(total / limit) - 1:
+    #     pagination_buttons.append(NEXT_PAGE_BUTTON)
     context.bot.send_message(
         chat_id=chat_id,
         text=message,
-        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [RESTART_BUTTON]], one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [SUBSCRIBE_BUTTON, RESTART_BUTTON]], one_time_keyboard=True)
     )
 
 
