@@ -21,9 +21,9 @@ from metrics import emit_metric
 
 load_dotenv()
 
-from telegram import ReplyKeyboardMarkup, Update
+from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
-    ContextTypes, CallbackContext
+    ContextTypes, CallbackContext, CallbackQueryHandler
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -66,6 +66,20 @@ WAITER_BUTTON = "💁 Waiter / hostess"
 HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
 NEXT_PAGE_BUTTON = "⏭"
 PREV_PAGE_BUTTON = "⏮"
+SUBMIT_CATEGORY_BUTTON = "Submit"
+
+JOB_CATEGORIES = {
+    "COURIER_BUTTON": "☐ 🚚 Courier",
+    "WAITER_BUTTON": "☐ 💁 Waiter / hostess",
+    "HANDYMAN_BUTTON": "☐ 🔨Handyman in the kitchen / in the hotel"
+}
+
+keyboard = [
+    [InlineKeyboardButton(JOB_CATEGORIES["COURIER_BUTTON"], callback_data='COURIER_BUTTON')], 
+    [InlineKeyboardButton(JOB_CATEGORIES["WAITER_BUTTON"], callback_data='WAITER_BUTTON')], 
+    [InlineKeyboardButton(JOB_CATEGORIES["HANDYMAN_BUTTON"], callback_data='HANDYMAN_BUTTON')], 
+    [InlineKeyboardButton(SUBMIT_CATEGORY_BUTTON, callback_data=SUBMIT_CATEGORY_BUTTON)]]
+job_search_reply_markup = InlineKeyboardMarkup(keyboard)
 
 menu_kb = ReplyKeyboardMarkup([
     [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON], [SUBMIT_JOB_BUTTON, PARSE_PHOTO_BUTTON],
@@ -140,23 +154,91 @@ def job_search_ask_job_categories(update, context):
     context.user_data['user_data']['speak_english'] = update.effective_message.text
     update.message.reply_text(
         responses["JOB_SEARCH_ASK_CATEGORIES"],
-        reply_markup=ReplyKeyboardMarkup([[COURIER_BUTTON, WAITER_BUTTON, HANDYMAN_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
-        )
+        reply_markup=job_search_reply_markup
+    )
     emit_metric(type="etc", action="job_search_ask_job_categories")
     return SAVE_JOB_SEARCH_APPLICATION
 
-def job_search_save_application(update, context):
-    context.user_data['user_data']['job_category'] = update.effective_message.text
+def update_button(callback_text):
+
+    if '✔️' in JOB_CATEGORIES[callback_text]:
+        JOB_CATEGORIES[callback_text] = JOB_CATEGORIES[callback_text].replace('✔️', '☐')
+    elif '☐' in JOB_CATEGORIES[callback_text]:
+        JOB_CATEGORIES[callback_text] = JOB_CATEGORIES[callback_text].replace('☐', '✔️')
+
+    return JOB_CATEGORIES
+
+def keyboard_callback(update, context):
+    query = update.callback_query
+
+    if query.data == SUBMIT_CATEGORY_BUTTON:
+        return job_search_save_application(update, context, query)
+
+    else:
+        JOB_CATEGORIES = update_button(query.data)
+        context.user_data['user_data']['job_category'] = JOB_CATEGORIES
+
+        query.answer(f'selected: {JOB_CATEGORIES[query.data]}')
+
+        keyboard = []
+        for category in JOB_CATEGORIES:
+            keyboard.append([InlineKeyboardButton(JOB_CATEGORIES[category], callback_data=category)])
+        keyboard.append([InlineKeyboardButton(SUBMIT_CATEGORY_BUTTON, callback_data=SUBMIT_CATEGORY_BUTTON)])
+        job_search_reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.bot.edit_message_reply_markup(
+            chat_id=update.callback_query.message.chat.id,
+            message_id=update.callback_query.message.message_id, 
+            reply_markup=job_search_reply_markup
+        )
+        return SAVE_JOB_SEARCH_APPLICATION
+
+
+def prepare_job_categories_for_saving(categories):
+    if not categories:
+        return {}
+    selected_categories = []
+    for cat in categories:
+        if '✔️' in categories[cat]:
+            category = categories[cat].split('✔️')[-1].strip()
+            selected_categories.append(category)
+    return selected_categories
+
+
+def job_search_save_application(update, context, query):
+    context.user_data['user_data']['job_category'] = prepare_job_categories_for_saving(
+        categories=context.user_data['user_data'].get('job_category')
+    )
     context.user_data['user_data']['timestamp'] = dt.utcnow().replace(tzinfo=amsterdam_timezone)
 
     job_applicant_summary = responses["JOB_APPLICANT_SUMMARY"]
     for field in ['first_name', 'city', 'speak_english', 'job_category']:
-        job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
-        dbservice.update_user_data(update.message, {field: context.user_data['user_data'][field]})
+        if field == "job_category":
+            try:
+                selected_jobs_text = ", ".join(context.user_data['user_data'][field])
+                job_applicant_summary = job_applicant_summary.replace('{' + field + '}', selected_jobs_text)
+            except Exception as e:
+                print(e)
+                continue
+        else:
+            job_applicant_summary = job_applicant_summary.replace('{' + field + '}', context.user_data['user_data'][field])
+        dbservice.update_user_data(
+            user_id=context.user_data["user_data"]["user_id"], update_dict={field: context.user_data['user_data'][field]}
+        )
 
-    update.message.reply_text(responses["JOB_SEARCH_SUMMARY"])
-    update.message.reply_text(job_applicant_summary)
-    update.message.reply_text(responses["JOB_SEARCH_END"], reply_markup=menu_kb)
+    context.bot.send_message(
+            chat_id=update.callback_query.message.chat.id,
+            text=responses["JOB_SEARCH_SUMMARY"]
+    )
+    context.bot.send_message(
+        chat_id=update.callback_query.message.chat.id,
+        text=job_applicant_summary
+    )
+    context.bot.send_message(
+        chat_id=update.callback_query.message.chat.id,
+        text=responses["JOB_SEARCH_END"],
+        reply_markup=menu_kb
+    )
     emit_metric(type="etc", action="job_search_save_application")
     return WELCOME
 
@@ -516,7 +598,7 @@ def main():
                 CommandHandler('start', start_command)
             ],
             AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories), CommandHandler('start', start_command)],
-            SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application), CommandHandler('start', start_command)],
+            SAVE_JOB_SEARCH_APPLICATION: [CallbackQueryHandler(keyboard_callback), CommandHandler('start', start_command)],
             AWAITING_JOB_ADDRESS: [MessageHandler(filters=None, callback=submit_job_address), CommandHandler('start', start_command)],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),

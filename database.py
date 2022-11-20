@@ -63,11 +63,11 @@ class DBService:
             print(error)
             return False
 
-    def update_user_data(self, message, update_dict):
+    def update_user_data(self, user_id, update_dict):
         try:
-            self._users_collection.update_one(
+            res = self._users_collection.update_one(
                 {
-                    '_id': message.from_user.id
+                    '_id': user_id
                 },
                 {
                      '$set': { **update_dict }
