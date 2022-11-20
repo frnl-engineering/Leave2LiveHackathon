@@ -107,6 +107,9 @@ def start_command(update, context):
         reply_markup=menu_kb
     )
     emit_metric(type="etc", action="start_command")
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
 
     # On start/restart remove all notifications subscriptions
     remove_job_if_exists(str(update.effective_message.chat_id), context)
@@ -119,6 +122,9 @@ def job_search_ask_name(update, context):
     dbservice.register_user(update.message)
     update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
     emit_metric(type="etc", action="job_search_ask_name")
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return AWAITING_JOB_APPLICANT_NAME
 
 
@@ -300,6 +306,9 @@ def parse_job_photo_title(update, context):
     update.message.reply_text(
         responses["PARSE_PHOTO_ASK_JOB_TITLE"]
         )
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return AWAITING_JOB_PHOTO_TITLE
 
 
@@ -369,6 +378,9 @@ def submit_job_command(update, context):
         reply_markup=ReplyKeyboardMarkup([[UPLOAD_PHOTO_BUTTON, SHARE_LINK_BUTTON]], one_time_keyboard=True)
     )
     emit_metric(type="etc", action="submit_job_command")
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return SUBMIT_JOB_FLOW
 
 def submit_photo(update, context):
