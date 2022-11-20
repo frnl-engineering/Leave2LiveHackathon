@@ -177,7 +177,7 @@ class DBService:
         except Exception as error:
             print(error)
 
-    def get_jobs_by_user_filter(self, user_filter):
+    def get_jobs_by_user_filter(self, user_filter, page=0, limit=5):
         """
         return list of jobs that match user filter: city, job_type, salary
         """
@@ -190,8 +190,13 @@ class DBService:
         if user_filter.get("category"):
             filter["category"] = user_filter["job_category"]
         try:
-            return list(self._jobs_collection.find(filter))
+            offset = page * limit
+            return {
+                "jobs": list(self._jobs_collection.find(filter).sort("updated_at", -1).limit(limit).skip(offset)),
+                "limit": limit,
+                "offset": offset,
+                "total": self._jobs_collection.count_documents(filter)
+            }
 
         except Exception as error:
             print(error)
-

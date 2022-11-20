@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import logging
@@ -10,7 +11,7 @@ from datetime import datetime as dt
 
 from google_map_class import GoogleMapsClass
 
-from database import DBService 
+from database import DBService
 
 
 from dotenv import load_dotenv
@@ -19,7 +20,7 @@ load_dotenv()
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
-    ContextTypes
+    ContextTypes, CallbackContext
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ AWAITING_JOB_APPLICANT_LANGUAGE = 10
 
 JOB_SEARCH_BUTTON = "💼 Find job"
 SUBMIT_JOB_BUTTON = "📸 Submit job"
-PARSE_PHOTO_BUTTON = "📝 Parse photo"
+SUBSCRIBE_BUTTON = "📝 Subscribe"
 RESTART_BUTTON = "🔄 Restart"
 YES_BUTTON = "✅ Yes"
 NO_BUTTON = "❌ No"
@@ -54,9 +55,10 @@ SHARE_LINK_BUTTON = "📝 Share a link/text"
 COURIER_BUTTON = "🚚 Courier"
 WAITER_BUTTON = "💁 Waiter / hostess"
 HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
+NEXT_PAGE_BUTTON = "⏭"
+PREV_PAGE_BUTTON = "⏮"
 
-
-menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_JOB_BUTTON, PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_JOB_BUTTON, SUBSCRIBE_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
 
 dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
 
@@ -65,7 +67,11 @@ def start_command(update, context):
     update.message.reply_text(
         responses["WELCOME_MESSAGE"],
         reply_markup=menu_kb
-        )
+    )
+
+    # On start/restart remove all notifications subscriptions
+    remove_job_if_exists(str(update.effective_message.chat_id), context)
+
     return WELCOME
 
 def job_search_ask_name(update, context):
@@ -225,39 +231,119 @@ def submit_job_text_handler(update, context):
     return WELCOME
 
 
-def notify(context) -> None:
-    chat_id = context.job.context['chat_id']
-    user_id = context.job.context['user_id']
-    # job_industry = "Cafe and restaurants"
-    # location = "Enschede, Netherlands"
+# TODO handle ⏭ properly
+def traverse_jobs(update, context):
+    chat_id = update.message.chat_id
+    user_id = update.message.from_user.id
+
+    if not context.user_data:
+        context.user_data['user_data'] = {'page': 0}
+    if update.message.text is NEXT_PAGE_BUTTON:
+        context.user_data['user_data']['page'] += 1
+    elif update.message.text is PREV_PAGE_BUTTON:
+        context.user_data['user_data']['page'] -= 1
+
+    page = context.user_data['user_data']['page']
+    limit = 5
 
     user_filter = dbservice.get_user_data(user_id=user_id)
-    jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter)
+    jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter, page=page, limit=limit)
 
-    if not jobs_details:
-        context.bot.send_message(chat_id=chat_id, text="Hi, no jobs found today")
+    total = jobs_details['total']
+    # no jobs for this user
+    if total == 0:
         return
 
-    message = "Hi, today we found {0} job(s) for you:\n".format(len(jobs_details))
-    for job in jobs_details:
-        message += "Job title: {0}\nCity: {1}\nCompany: {2}\nSalary per hour: {3}\nLink: {4}\n\n".format(
-            job["title"], job["city"], job["company"], job["salary"], job["link"])
+    pages = ""
+    if total > limit:
+        pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit))
+
+    message = "Hi, today we found {0} job(s) for you. {1}\n\n".format(total, pages)
+
+    for job in jobs_details['jobs']:
+        message += "Job title: {0}\nCity: {1}\nCompany: {2}\nLink: {3}\nJob updated at: {4}\n\n".format(
+            job["title"], job["city"], job["company"], job["link"], job["updated_at"])
 
     logger.info("Notification to %s", chat_id)
 
-    context.bot.send_message(chat_id=chat_id, text=message)
+    pagination_buttons = []
+    if page > 0:
+        pagination_buttons.append(PREV_PAGE_BUTTON)
+    if page < math.ceil(total / limit) - 1:
+        pagination_buttons.append(NEXT_PAGE_BUTTON)
 
-
-def parse_photo_command(update: Update, context) -> None:
-    update.message.reply_text(
-        "Please parse this photo",
-        reply_markup=menu_kb
+    context.bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [RESTART_BUTTON]], one_time_keyboard=True)
     )
 
+
+def notify_user_about_jobs(context: CallbackContext) -> None:
+    chat_id = context.job.context['chat_id']
+    user_id = context.job.context['user_id']
+
+    page = 0
+    limit = 5
+    user_filter = dbservice.get_user_data(user_id=user_id)
+    jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter, page=page, limit=limit)
+
+    total = jobs_details['total']
+    # no jobs for this user
+    if total == 0:
+        return
+
+    pages = ""
+    if total > limit:
+        pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit))
+
+    message = "Hi, today we found {0} job(s) for you. {1}\n\n".format(total, pages)
+
+    format = "%d.%m.%Y %H:%M"
+    for job in jobs_details['jobs']:
+        message += "Job title: {0}\nCity: {1}\nCompany: {2}\nLink: {3}\nJob approved: {4}\n\n".format(
+            job["title"], job["city"], job["company"], job["link"], job["updated_at"].strftime(format))
+
+    logger.info("Notification to %s", chat_id)
+
+    pagination_buttons = []
+    if page > 0:
+        pagination_buttons.append(PREV_PAGE_BUTTON)
+    if page < math.ceil(total / limit) - 1:
+        pagination_buttons.append(NEXT_PAGE_BUTTON)
+    context.bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [RESTART_BUTTON]], one_time_keyboard=True)
+    )
+
+
+def remove_job_if_exists(name: str, context) -> bool:
+    """Remove job with given name. Returns whether job was removed."""
+
+    current_jobs = context.job_queue.get_jobs_by_name(name)
+    if not current_jobs:
+        return False
+
+    for job in current_jobs:
+        job.schedule_removal()
+    return True
+
+
+def subscribe_command(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
-    ten_minutes = 5  # 60 * 10 # 10 minutes in seconds
+    job_name = str(chat_id)
+
+    # If job already exists, we delete it and stop subscription
+    job_removed = remove_job_if_exists(name=job_name, context=context)
+    if job_removed:
+        update.message.reply_text("Your subscription has been cancelled.", reply_markup=menu_kb)
+        return
+    update.message.reply_text("You have been subscribed.", reply_markup=menu_kb)
+
+    two_minutes = 5  # 60 * 10 # 10 minutes in seconds
     job_context = {"user_id": update.message.from_user.id, "chat_id": chat_id}
-    context.job_queue.run_once(callback=notify, when=ten_minutes, context=job_context)
+    context.job_queue.run_repeating(name=job_name, callback=notify_user_about_jobs, interval=two_minutes, context=job_context)
     # Whatever you pass here as context is available in the job.context variable of the callback
 
 
@@ -266,7 +352,7 @@ def help_command(update, context):
 
 
 def free_input_command(update, context):
-    update.message.reply_text("Sorry, I didn't undersrtand what you said. Try using one of our commands", reply_markup=menu_kb)
+    update.message.reply_text("Sorry, I didn't understand what you said. Try using one of our commands", reply_markup=menu_kb)
 
 
 def error(update, context):
@@ -285,7 +371,7 @@ def main():
             WELCOME: [
                 MessageHandler(filters=Filters.text(JOB_SEARCH_BUTTON), callback=job_search_ask_name),
                 MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command),
-                MessageHandler(filters=Filters.text(PARSE_PHOTO_BUTTON), callback=parse_photo_command),
+                MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command),
                 ],
             AWAITING_JOB_APPLICANT_NAME: [MessageHandler(filters=None, callback=job_search_ask_postcode)],
