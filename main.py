@@ -46,10 +46,15 @@ SUBMIT_PHOTO_FLOW = 8
 SUBMIT_LINK_FLOW = 9
 AWAITING_JOB_APPLICANT_LANGUAGE = 10
 AWAITING_JOB_ADDRESS = 11
+AWAITING_JOB_PHOTO_TITLE = 12
+AWAITING_JOB_PHOTO_CITY = 13
+AWAITING_JOB_PHOTO_COMPANY = 14
+AWAITING_JOB_PHOTO_CATEGOTY = 15
 
 JOB_SEARCH_BUTTON = "💼 Find job"
+SUBSCRIBE_BUTTON = "💼 Subscribe"
 SUBMIT_JOB_BUTTON = "📸 Submit job"
-SUBSCRIBE_BUTTON = "📝 Subscribe"
+PARSE_PHOTO_BUTTON = "📝 Parse job description"
 RESTART_BUTTON = "🔄 Restart"
 YES_BUTTON = "✅ Yes"
 NO_BUTTON = "❌ No"
@@ -61,7 +66,10 @@ HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
 NEXT_PAGE_BUTTON = "⏭"
 PREV_PAGE_BUTTON = "⏮"
 
-menu_kb = ReplyKeyboardMarkup([[JOB_SEARCH_BUTTON, SUBMIT_JOB_BUTTON, SUBSCRIBE_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+menu_kb = ReplyKeyboardMarkup([
+    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON], [SUBMIT_JOB_BUTTON, PARSE_PHOTO_BUTTON],
+    [RESTART_BUTTON]
+], one_time_keyboard=True)
 
 dbservice = DBService(db_name=os.getenv("DB_NAME"), connection_string=os.getenv("DB_URI"))
 
@@ -171,6 +179,71 @@ def _create_user_data_object(update, context):
         logger.info('set default user data %s' % context.user_data['user_data'])
 
     context.user_data['user_data']['username'] = user_data['username']
+
+
+def parse_job_photo_title(update, context):
+    # TODO: get random job from the database/load photo with category "for_parsing". In the end after submitting translation mark it as "parsed"
+    context.user_data['job_object'] = {}
+    update.message.reply_text(
+        responses["PARSE_PHOTO_INTRO"]
+    )
+    update.message.reply_text(
+        "Random job text/photo"
+    )
+    update.message.reply_text(
+        responses["PARSE_PHOTO_ASK_JOB_TITLE"]
+        )
+    return AWAITING_JOB_PHOTO_TITLE
+
+
+def parse_job_photo_city(update, context):
+    context.user_data['job_object']['title'] = update.effective_message.text
+    update.message.reply_text(
+        responses["PARSE_PHOTO_ASK_JOB_CITY"]
+        )
+    return AWAITING_JOB_PHOTO_CITY
+
+
+def parse_job_photo_company(update, context):
+    context.user_data['job_object']['city'] = update.effective_message.text
+    update.message.reply_text(
+        responses["PARSE_PHOTO_ASK_JOB_COMPANY"]
+        )
+    return AWAITING_JOB_PHOTO_COMPANY
+
+
+def parse_job_photo_category(update, context):
+    context.user_data['job_object']['company'] = update.effective_message.text
+    update.message.reply_text(
+        responses["PARSE_PHOTO_ASK_JOB_CATEGORY"],
+        reply_markup=ReplyKeyboardMarkup([[COURIER_BUTTON, WAITER_BUTTON, HANDYMAN_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
+    )
+    return AWAITING_JOB_PHOTO_CATEGOTY
+
+
+def parse_job_photo_thanks(update, context):
+    context.user_data['job_object']['category'] = update.effective_message.text
+    dbservice.insert_job(
+    {
+        "id": str(uuid.uuid4()),
+        "title": context.user_data['job_object']['title'],
+        "company": context.user_data['job_object']['company'],
+        "description": "???",
+        "link": "???",
+        "category": context.user_data['job_object']['category'],
+        "city": context.user_data['job_object']['city'],
+        "salary": "???",
+        "created_at": dt.utcnow(),
+        "updated_at": dt.utcnow(),
+        "languages": ["English", "Dutch"],
+        "status": "active",
+    }
+    )
+
+    update.message.reply_text(
+        responses["PARSE_PHOTO_THANKS"], reply_markup=menu_kb
+        )
+    return WELCOME
 
 
 def submit_job_command(update, context):
@@ -416,28 +489,35 @@ def main():
             WELCOME: [
                 MessageHandler(filters=Filters.text(JOB_SEARCH_BUTTON), callback=job_search_ask_name),
                 MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command),
+                MessageHandler(filters=Filters.text(PARSE_PHOTO_BUTTON), callback=parse_job_photo_title),
                 MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command),
                 ],
-            AWAITING_JOB_APPLICANT_NAME: [MessageHandler(filters=None, callback=job_search_ask_postcode)],
-            AWAITING_JOB_APPLICANT_POSTCODE: [MessageHandler(filters=None, callback=job_search_confirm_postcode)],
+            AWAITING_JOB_APPLICANT_NAME: [MessageHandler(filters=None, callback=job_search_ask_postcode), CommandHandler('start', start_command)],
+            AWAITING_JOB_APPLICANT_POSTCODE: [MessageHandler(filters=None, callback=job_search_confirm_postcode), CommandHandler('start', start_command)],
             CONFIRM_JOB_APPLICANT_POSTCODE: [
                 MessageHandler(filters=Filters.text(YES_BUTTON), callback=job_search_ask_language),
-                MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode)
+                MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode),
+                CommandHandler('start', start_command)
             ],
-            AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories)],
-            SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
-            AWAITING_JOB_ADDRESS: [MessageHandler(filters=None, callback=submit_job_address)],
+            AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories), CommandHandler('start', start_command)],
+            SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application), CommandHandler('start', start_command)],
+            AWAITING_JOB_ADDRESS: [MessageHandler(filters=None, callback=submit_job_address), CommandHandler('start', start_command)],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),
-              MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_job_text_link)
+              MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_job_text_link),
+              CommandHandler('start', start_command)
             ],
             SUBMIT_PHOTO_FLOW: [
-                MessageHandler(filters=Filters.photo, callback=image_handler)
+                MessageHandler(filters=Filters.photo, callback=image_handler), CommandHandler('start', start_command)
             ],
             SUBMIT_LINK_FLOW: [
-                MessageHandler(filters=None, callback=submit_job_text_handler)  # todo: update callback
-            ]
+                MessageHandler(filters=None, callback=submit_job_text_handler), CommandHandler('start', start_command)
+            ],
+            AWAITING_JOB_PHOTO_TITLE: [MessageHandler(filters=None, callback=parse_job_photo_city), CommandHandler('start', start_command)],
+            AWAITING_JOB_PHOTO_CITY: [MessageHandler(filters=None, callback=parse_job_photo_company), CommandHandler('start', start_command)],
+            AWAITING_JOB_PHOTO_COMPANY: [MessageHandler(filters=None, callback=parse_job_photo_category), CommandHandler('start', start_command)],
+            AWAITING_JOB_PHOTO_CATEGOTY: [MessageHandler(filters=None, callback=parse_job_photo_thanks), CommandHandler('start', start_command)],
       },
       fallbacks=[MessageHandler(Filters.text, free_input_command)],
       )
@@ -446,6 +526,7 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('start', start_command))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(JOB_SEARCH_BUTTON), callback=job_search_ask_name))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command))
+    updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(PARSE_PHOTO_BUTTON), callback=parse_job_photo_title))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command))
 

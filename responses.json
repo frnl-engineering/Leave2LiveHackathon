@@ -13,5 +13,11 @@
     "SUBMIT_PHOTO_MESSAGE_2": "Most of refugees are not speaking Dutch and/ or possess special skills, so we focus on HORECA jobs, such as hostess, couriers, waiters, general workers.",
     "SUBMIT_PHOTO_MESSAGE_3": "Did you spot a job poster for such a vacancy onstreet? You can upload a photo of the poster and we will pick it up from there. \n\nFound out about a vacancy online? Just share a link with us!",
     "SUBMIT_PHOTO": "Please upload a photo:",
-    "SUBMIT_LINK": "Please write job description:"
+    "SUBMIT_LINK": "Please write job description:",
+    "PARSE_PHOTO_INTRO": "Thanks for helping us organise job descriptions. Here is the full text. ",
+    "PARSE_PHOTO_ASK_JOB_TITLE": "What's the job title?",
+    "PARSE_PHOTO_ASK_JOB_CITY": "Which city?",
+    "PARSE_PHOTO_ASK_JOB_COMPANY": "Which company?",
+    "PARSE_PHOTO_ASK_JOB_CATEGORY": "Which category?",
+    "PARSE_PHOTO_THANKS": "Thanks! Now we can start showing this job to applicants. "
 }
