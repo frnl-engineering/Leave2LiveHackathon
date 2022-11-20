@@ -429,6 +429,7 @@ def image_handler(update, context):
         current_job_to_submit_id = dbservice.insert_raw_job(raw_job)
         if current_job_to_submit_id:
             context.user_data['current_job_to_submit_id'] = current_job_to_submit_id.inserted_id
+        update.message.reply_text("By the way, where did you spot this job? Please type in name of the city and full address if possible.")
     except Exception as e:
         print(e)
         update.message.reply_text("Something went wrong, please try again later.", reply_markup=menu_kb)
