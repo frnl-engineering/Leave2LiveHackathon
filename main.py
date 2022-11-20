@@ -285,6 +285,12 @@ def _create_user_data_object(update, context):
 def parse_job_photo_title(update, context):
     # TODO: get random job from the database/load photo with category "for_parsing". In the end after submitting translation mark it as "parsed"
     all_raw_jobs = dbservice.get_all_raw_jobs()
+    if not all_raw_jobs:
+        update.message.reply_text(
+            responses["PARSE_PHOTO_EMPTY"],
+            reply_markup=menu_kb
+        )
+        return WELCOME
     random_job = random.choice(all_raw_jobs)
     context.user_data['current_job_to_parse_id'] = random_job["_id"]
     context.user_data['job_object'] = {}
