@@ -491,6 +491,12 @@ def notify_user_about_jobs(context: CallbackContext) -> None:
     chat_id = context.job.context['chat_id']
     user_id = context.job.context['user_id']
 
+    # Trash-like emitting counter metrics
+
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
+
     page = 0
     limit = 5
     user_filter = dbservice.get_user_data(user_id=user_id)

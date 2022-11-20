@@ -101,6 +101,16 @@ class DBService:
         except Exception as error:
             print(error)
 
+    def count_users(self):
+        """
+        return list with only users ids from collection[users]
+        lust(int, int, int,...)
+        """
+        try:
+            return self._users_collection.count_documents()
+        except Exception as error:
+            print(error)
+
     def get_user_data(self, user_id):
         """
         return user data by user id
@@ -177,6 +187,12 @@ class DBService:
         except Exception as error:
             print(error)
 
+    def count_raw_unchecked_jobs(self):
+        try:
+            return self._jobs_to_validate_collection.count_documents({"checked_by": None})
+        except Exception as error:
+            print(error)
+
     def update_raw_job_data(self, raw_job_id, user_id):
         try:
             self._jobs_to_validate_collection.update_one(
@@ -189,6 +205,12 @@ class DBService:
             )
             return True
 
+        except Exception as error:
+            print(error)
+
+    def count_verified_jobs(self):
+        try:
+            return self._jobs_collection.count_documents()
         except Exception as error:
             print(error)
 
