@@ -173,7 +173,7 @@ class DBService:
 
     def get_all_raw_jobs(self):
         try:
-            return list(self._jobs_to_validate_collection.find({ "checked_by", None }))
+            return list(self._jobs_to_validate_collection.find({ "checked_by": None }))
         except Exception as error:
             print(error)
 
