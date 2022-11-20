@@ -7,7 +7,8 @@ Leave2LiveHackathon submission
 conda create -n l2l python=3.8
 conda activate l2l
 pip install -r requirements.txt
-
+brew install tesseract
+brew install tesseract-lang # for ukranian, russian languages support
 ```
 
 ### 2. Create .env file
