@@ -107,7 +107,7 @@ class DBService:
         lust(int, int, int,...)
         """
         try:
-            return self._users_collection.count_documents()
+            return self._users_collection.count_documents({})
         except Exception as error:
             print(error)
 
@@ -210,7 +210,7 @@ class DBService:
 
     def count_verified_jobs(self):
         try:
-            return self._jobs_collection.count_documents()
+            return self._jobs_collection.count_documents({})
         except Exception as error:
             print(error)
 
