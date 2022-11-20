@@ -426,9 +426,9 @@ def image_handler(update, context):
             "checked_by": None,
             # "image_base64": image_base64,
         }
-        current_job = dbservice.insert_raw_job(raw_job)
-        if current_job:
-            current_job_to_submit_id = current_job.inserted_id
+        current_job_to_submit_id = dbservice.insert_raw_job(raw_job)
+        if current_job_to_submit_id:
+            context.user_data['current_job_to_submit_id'] = current_job_to_submit_id.inserted_id
     except Exception as e:
         print(e)
         update.message.reply_text("Something went wrong, please try again later.", reply_markup=menu_kb)
