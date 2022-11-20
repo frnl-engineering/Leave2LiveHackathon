@@ -16,6 +16,8 @@ from database import DBService
 
 from dotenv import load_dotenv
 
+from metrics import emit_metric
+
 load_dotenv()
 
 from telegram import ReplyKeyboardMarkup, Update
@@ -69,6 +71,7 @@ def start_command(update, context):
         responses["WELCOME_MESSAGE"],
         reply_markup=menu_kb
     )
+    emit_metric(type="etc", action="start_command")
 
     # On start/restart remove all notifications subscriptions
     remove_job_if_exists(str(update.effective_message.chat_id), context)
@@ -80,6 +83,7 @@ def job_search_ask_name(update, context):
     _create_user_data_object(update, context)
     dbservice.register_user(update.message)
     update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
+    emit_metric(type="etc", action="job_search_ask_name")
     return AWAITING_JOB_APPLICANT_NAME
 
 
@@ -87,11 +91,13 @@ def job_search_ask_postcode(update, context):
     logger.info('%s: job_search_ask_postcode' % update.message.from_user['id'])
     context.user_data['user_data']['first_name'] = update.effective_message.text
     update.message.reply_text(responses["JOB_SEARCH_ASK_POSTCODE"])
+    emit_metric(type="etc", action="job_search_ask_postcode")
     return AWAITING_JOB_APPLICANT_POSTCODE
 
 
 def job_search_confirm_postcode(update, context):
     logger.info('%s: job_search_confirm_postcode' % update.message.from_user['id'])
+    emit_metric(type="etc", action="job_search_confirm_postcode")
 
     found_addresses, postcode_is_correct = gm.find_address_from_input(update.effective_message.text)
     if found_addresses:
@@ -118,6 +124,7 @@ def job_search_ask_language(update, context):
         responses["JOB_SEARCH_ASK_LANGUAGE"],
         reply_markup=ReplyKeyboardMarkup([[YES_BUTTON, NO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
+    emit_metric(type="etc", action="job_search_ask_language")
     return AWAITING_JOB_APPLICANT_LANGUAGE
 
 def job_search_ask_job_categories(update, context):
@@ -126,6 +133,7 @@ def job_search_ask_job_categories(update, context):
         responses["JOB_SEARCH_ASK_CATEGORIES"],
         reply_markup=ReplyKeyboardMarkup([[COURIER_BUTTON, WAITER_BUTTON, HANDYMAN_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True)
         )
+    emit_metric(type="etc", action="job_search_ask_job_categories")
     return SAVE_JOB_SEARCH_APPLICATION
 
 def job_search_save_application(update, context):
@@ -140,7 +148,7 @@ def job_search_save_application(update, context):
     update.message.reply_text(responses["JOB_SEARCH_SUMMARY"])
     update.message.reply_text(job_applicant_summary)
     update.message.reply_text(responses["JOB_SEARCH_END"], reply_markup=menu_kb)
-
+    emit_metric(type="etc", action="job_search_save_application")
     return WELCOME
 
 def _create_user_data_object(update, context):
@@ -187,6 +195,7 @@ def submit_job_address(update, context):
          "Thanks. Do you want to submit a photo or job description?",
         reply_markup=ReplyKeyboardMarkup([[UPLOAD_PHOTO_BUTTON, SHARE_LINK_BUTTON]], one_time_keyboard=True)
     )
+    emit_metric(type="etc", action="submit_job_command")
     return SUBMIT_JOB_FLOW
 
 
@@ -194,6 +203,7 @@ def submit_photo(update, context):
     update.message.reply_text(
         responses["SUBMIT_PHOTO"]
     )
+    emit_metric(type="etc", action="submit_photo")
     return SUBMIT_PHOTO_FLOW
 
 
@@ -201,10 +211,12 @@ def submit_job_text_link(update, context):
     update.message.reply_text(
         responses["SUBMIT_LINK"]
     )
+    emit_metric(type="etc", action="submit_job_text_link")
     return SUBMIT_LINK_FLOW
 
 
 def image_handler(update, context):
+    emit_metric(type="etc", action="image_handler")
     # TODO make transaction atomic
     try:
         msg_file = update.message.photo[0].file_id
@@ -242,6 +254,7 @@ def submit_job_text_handler(update, context):
     }
     dbservice.insert_raw_job(raw_job)
     update.message.reply_text("Thank you, we saved information about the job.", reply_markup=menu_kb)
+    emit_metric(type="etc", action="submit_job_text_handler")
     return WELCOME
 
 
@@ -322,9 +335,11 @@ def notify_user_about_jobs(context: CallbackContext) -> None:
     jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter, page=page, limit=limit)
 
     total = jobs_details['total']
-    if total == 0:  # no jobs for this user
-        return
 
+    if total == 0:  # no jobs for this user
+        emit_metric(type="job", action="notification_skipped")
+        return
+    emit_metric(type="job", action="notification_sent", value=str(total))
     pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit)) if total > limit else ""
     message = "Hi, today we found {0} job(s) for you. {1}\n\n".format(total, pages)
     for job in jobs_details['jobs']:
@@ -353,6 +368,7 @@ def remove_job_if_exists(name: str, context) -> bool:
 
     for job in current_jobs:
         job.schedule_removal()
+    emit_metric(type="user", action="unsubscribe")
     return True
 
 
@@ -365,6 +381,7 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
     if job_removed:
         update.message.reply_text("Your subscription has been cancelled.", reply_markup=menu_kb)
         return
+    emit_metric(type="user", action="subscribe")
     update.message.reply_text("You have been subscribed.", reply_markup=menu_kb)
 
     two_minutes = 30  # each 30 seconds
@@ -375,10 +392,12 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
 
 def help_command(update, context):
     update.message.reply_text("Use /start to test this bot.")
+    emit_metric(type="etc", action="help")
 
 
 def free_input_command(update, context):
     update.message.reply_text("Sorry, I didn't understand what you said. Try using one of our commands", reply_markup=menu_kb)
+    emit_metric(type="etc", action="free_input_command")
 
 
 def error(update, context):
