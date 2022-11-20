@@ -107,9 +107,6 @@ def start_command(update, context):
         reply_markup=menu_kb
     )
     emit_metric(type="etc", action="start_command")
-    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
-    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
-    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
 
     # On start/restart remove all notifications subscriptions
     remove_job_if_exists(str(update.effective_message.chat_id), context)
@@ -122,9 +119,6 @@ def job_search_ask_name(update, context):
     dbservice.register_user(update.message)
     update.message.reply_text(responses["JOB_SEARCH_ASK_NAME"])
     emit_metric(type="etc", action="job_search_ask_name")
-    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
-    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
-    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return AWAITING_JOB_APPLICANT_NAME
 
 
@@ -258,6 +252,9 @@ def job_search_save_application(update, context, query):
         reply_markup=menu_kb
     )
     emit_metric(type="etc", action="job_search_save_application")
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return WELCOME
 
 def _create_user_data_object(update, context):
@@ -380,6 +377,11 @@ def parse_job_photo_thanks(update, context):
 
     update.message.reply_text(
         responses["PARSE_PHOTO_THANKS"], reply_markup=ReplyKeyboardMarkup([[PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True))
+
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
+    
     return WELCOME
 
 
@@ -523,12 +525,6 @@ def format_job(job={}) -> str:
 def notify_user_about_jobs(context: CallbackContext) -> None:
     chat_id = context.job.context['chat_id']
     user_id = context.job.context['user_id']
-
-    # Trash-like emitting counter metrics
-
-    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
-    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
-    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
 
     page = 0
     limit = 5
