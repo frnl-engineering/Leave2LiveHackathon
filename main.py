@@ -279,6 +279,25 @@ def traverse_jobs(update, context):
     )
 
 
+def format_job(job={}) -> str:
+    datetime_format = "%d.%m.%Y %H:%M"
+    res = ""
+    if job["title"]:
+        res += "Job title: {0}\n".format(job["title"])
+    if job["city"]:
+        res += "City: {0}\n".format(job["city"])
+    if job["company"]:
+        res += "Company: {0}\n".format(job["company"])
+    if job["category"]:
+        res += "Category: {0}\n".format(job["category"])
+    if job["link"]:
+        res += "Link: {0}\n".format(job["link"])
+    if job["updated_at"]:
+        res += "Job updated at: {0}\n".format(job["updated_at"].strftime(datetime_format))
+    res += "\n"
+    return res
+
+
 def notify_user_about_jobs(context: CallbackContext) -> None:
     chat_id = context.job.context['chat_id']
     user_id = context.job.context['user_id']
@@ -289,20 +308,13 @@ def notify_user_about_jobs(context: CallbackContext) -> None:
     jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter, page=page, limit=limit)
 
     total = jobs_details['total']
-    # no jobs for this user
-    if total == 0:
+    if total == 0:  # no jobs for this user
         return
 
-    pages = ""
-    if total > limit:
-        pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit))
-
+    pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit)) if total > limit else ""
     message = "Hi, today we found {0} job(s) for you. {1}\n\n".format(total, pages)
-
-    format = "%d.%m.%Y %H:%M"
     for job in jobs_details['jobs']:
-        message += "Job title: {0}\nCity: {1}\nCompany: {2}\nLink: {3}\nJob approved: {4}\n\n".format(
-            job["title"], job["city"], job["company"], job["link"], job["updated_at"].strftime(format))
+        message += format_job(job)
 
     logger.info("Notification to %s", chat_id)
 
@@ -341,7 +353,7 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
         return
     update.message.reply_text("You have been subscribed.", reply_markup=menu_kb)
 
-    two_minutes = 5  # 60 * 10 # 10 minutes in seconds
+    two_minutes = 30  # each 30 seconds
     job_context = {"user_id": update.message.from_user.id, "chat_id": chat_id}
     context.job_queue.run_repeating(name=job_name, callback=notify_user_about_jobs, interval=two_minutes, context=job_context)
     # Whatever you pass here as context is available in the job.context variable of the callback
