@@ -295,6 +295,14 @@ def parse_job_photo_title(update, context):
             random_job['description']
         )
     else:
+        description = ""
+        if random_job['file_uri']:
+            text, lang = ocr.read_text_from_image_path(random_job['file_uri'])
+            if text:
+                description += "Text from the image:\n{0}\n\n".format(text)
+                translated_text = translate.translate(text)
+                if translated_text:
+                    description += "Translated text from the image:\n{0}\n\n".format(translated_text)
         update.message.reply_text(
             "Random job description"
         )
