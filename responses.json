@@ -19,5 +19,16 @@
     "PARSE_PHOTO_ASK_JOB_CITY": "Which city?",
     "PARSE_PHOTO_ASK_JOB_COMPANY": "Which company?",
     "PARSE_PHOTO_ASK_JOB_CATEGORY": "Which category?",
-    "PARSE_PHOTO_THANKS": "Thanks! Now we can start showing this job to applicants. "
+    "PARSE_PHOTO_THANKS": "Thanks! Now we can start showing this job to applicants. ",
+    "JOB_TITLE": "Job title",
+    "JOB_CITY": "City",
+    "JOB_COMPANY": "Company",
+    "JOB_CATEGORY": "Category",
+    "JOB_LINK": "Link",
+    "JOB_PHOTO": "Photo",
+    "JOB_UPDATED_AT": "Job updated at",
+    "UNSUBSCRIBE": "Your subscription has been cancelled.",
+    "SUBSCRIBE": "You have been subscribed.",
+    "PAGE_TEMPLATE": "Page {0} out of {1}.",
+    "MESSAGE_TEMPLATE": "Hi, today we found {0} job(s) for you. {1}\n\n"
 }

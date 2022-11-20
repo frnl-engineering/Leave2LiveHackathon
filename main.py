@@ -10,6 +10,8 @@ import random
 import pytz
 from datetime import datetime as dt
 
+import ocr
+import translate
 from google_map_class import GoogleMapsClass
 
 from database import DBService
@@ -25,7 +27,7 @@ from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKe
 from telegram.ext import Updater, ConversationHandler, CommandHandler, MessageHandler, Filters, DictPersistence, \
     ContextTypes, CallbackContext, CallbackQueryHandler
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s  - %(lineno)d  - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 gm = GoogleMapsClass()
@@ -335,7 +337,7 @@ def parse_job_photo_thanks(update, context):
         }
     )
 
-    dbservice.update_raw_job_data(context.user_data['current_job_to_parse_id'], update.message.from_user.id) 
+    dbservice.update_raw_job_data(context.user_data['current_job_to_parse_id'], update.message.from_user.id)
 
     update.message.reply_text(
         responses["PARSE_PHOTO_THANKS"], reply_markup=menu_kb
@@ -389,15 +391,24 @@ def image_handler(update, context):
     emit_metric(type="etc", action="image_handler")
     # TODO make transaction atomic
     try:
-        msg_file = update.message.photo[0].file_id
+        msg_file = update.message.photo[-1].file_id
         file_obj = context.bot.get_file(msg_file)
         if not os.path.exists("media/"):
             os.makedirs("media/")
         file_uri = f"media/{str(uuid.uuid4())}.jpg"
         file_obj.download(file_uri)
+
+        description = "Image caption: {}".format(update.message.caption) if update.message.caption else ""
+        text, lang = ocr.read_text_from_image_path(file_uri)
+        if text:
+            description += "\n\nText from image: {0}".format(text)
+            translated_text = translate.translate(text)
+            if translated_text:
+                description += "\n\nTranslated text from image: {0}".format(translated_text)
+
         dbservice.save_media_uri(message=update.message, image_uri=file_uri)
         raw_job = {
-            "description": update.message.caption,
+            "description": description,
             "address": context.user_data['job_address'],
             "file_uri": file_uri,
             "checked": False,
@@ -430,67 +441,28 @@ def submit_job_text_handler(update, context):
 
 # TODO handle ⏭ properly
 def traverse_jobs(update, context):
-    chat_id = update.message.chat_id
-    user_id = update.message.from_user.id
-
-    if not context.user_data:
-        context.user_data['user_data'] = {'page': 0}
-    if update.message.text is NEXT_PAGE_BUTTON:
-        context.user_data['user_data']['page'] += 1
-    elif update.message.text is PREV_PAGE_BUTTON:
-        context.user_data['user_data']['page'] -= 1
-
-    page = context.user_data['user_data']['page']
-    limit = 5
-
-    user_filter = dbservice.get_user_data(user_id=user_id)
-    jobs_details = dbservice.get_jobs_by_user_filter(user_filter=user_filter, page=page, limit=limit)
-
-    total = jobs_details['total']
-    # no jobs for this user
-    if total == 0:
-        return
-
-    pages = ""
-    if total > limit:
-        pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit))
-
-    message = "Hi, today we found {0} job(s) for you. {1}\n\n".format(total, pages)
-
-    for job in jobs_details['jobs']:
-        message += "Job title: {0}\nCity: {1}\nCompany: {2}\nLink: {3}\nJob updated at: {4}\n\n".format(
-            job["title"], job["city"], job["company"], job["link"], job["updated_at"])
-
-    logger.info("Notification to %s", chat_id)
-
-    pagination_buttons = []
-    if page > 0:
-        pagination_buttons.append(PREV_PAGE_BUTTON)
-    if page < math.ceil(total / limit) - 1:
-        pagination_buttons.append(NEXT_PAGE_BUTTON)
-
-    context.bot.send_message(
-        chat_id=chat_id,
-        text=message,
-        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [RESTART_BUTTON]], one_time_keyboard=True)
-    )
+    pass
 
 
 def format_job(job={}) -> str:
     datetime_format = "%d.%m.%Y %H:%M"
     res = ""
+
+    row_template = "{0}: {1}\n"
     if job["title"]:
-        res += "Job title: {0}\n".format(job["title"])
+        res += row_template.format(responses["JOB_TITLE"], job["title"])
     if job["city"]:
-        res += "City: {0}\n".format(job["city"])
+        res += row_template.format(responses["JOB_CITY"], job["city"])
     if job["company"]:
-        res += "Company: {0}\n".format(job["company"])
+        res += row_template.format(responses["JOB_COMPANY"], job["company"])
     if job["category"]:
-        res += "Category: {0}\n".format(job["category"])
+        res += row_template.format(responses["JOB_CATEGORY"], job["category"])
     if job["link"]:
-        res += "Link: {0}\n".format(job["link"])
+        res += row_template.format(responses["JOB_LINK"], job["link"])
+    if job.get("photo"):
+        res += row_template.format(responses["JOB_PHOTO"], job["photo"])
     if job["updated_at"]:
-        res += "Job updated at: {0}\n".format(job["updated_at"].strftime(datetime_format))
+        res += row_template.format(responses["JOB_UPDATED_AT"], job["updated_at"].strftime(datetime_format))
     res += "\n"
     return res
 
@@ -510,22 +482,22 @@ def notify_user_about_jobs(context: CallbackContext) -> None:
         emit_metric(type="job", action="notification_skipped")
         return
     emit_metric(type="job", action="notification_sent", value=str(total))
-    pages = "Page {0} out of {1}.".format(page + 1, math.ceil(total / limit)) if total > limit else ""
-    message = "Hi, today we found {0} job(s) for you. {1}\n\n".format(total, pages)
+    pages = responses["PAGE_TEMPLATE"].format(page + 1, math.ceil(total / limit)) if total > limit else ""
+    message = responses["MESSAGE_TEMPLATE"].format(total, pages)
     for job in jobs_details['jobs']:
         message += format_job(job)
 
     logger.info("Notification to %s", chat_id)
 
     pagination_buttons = []
-    if page > 0:
-        pagination_buttons.append(PREV_PAGE_BUTTON)
-    if page < math.ceil(total / limit) - 1:
-        pagination_buttons.append(NEXT_PAGE_BUTTON)
+    # if page > 0:
+    #     pagination_buttons.append(PREV_PAGE_BUTTON)
+    # if page < math.ceil(total / limit) - 1:
+    #     pagination_buttons.append(NEXT_PAGE_BUTTON)
     context.bot.send_message(
         chat_id=chat_id,
         text=message,
-        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [RESTART_BUTTON]], one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([pagination_buttons, [SUBSCRIBE_BUTTON, RESTART_BUTTON]], one_time_keyboard=True)
     )
 
 
@@ -549,10 +521,10 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
     # If job already exists, we delete it and stop subscription
     job_removed = remove_job_if_exists(name=job_name, context=context)
     if job_removed:
-        update.message.reply_text("Your subscription has been cancelled.", reply_markup=menu_kb)
+        update.message.reply_text(responses["UNSUBSCRIBE"], reply_markup=menu_kb)
         return
     emit_metric(type="user", action="subscribe")
-    update.message.reply_text("You have been subscribed.", reply_markup=menu_kb)
+    update.message.reply_text(responses["SUBSCRIBE"], reply_markup=menu_kb)
 
     two_minutes = 30  # each 30 seconds
     job_context = {"user_id": update.message.from_user.id, "chat_id": chat_id}
