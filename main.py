@@ -291,11 +291,24 @@ def parse_job_photo_title(update, context):
     update.message.reply_text(
         responses["PARSE_PHOTO_INTRO"]
     )
+
+    if random_job['file_uri']:
+        pic = os.path.expanduser(random_job['file_uri'])
+        update.message.reply_photo(photo=open(pic, 'rb'))
+
     if random_job['description']:
         update.message.reply_text(
             random_job['description']
         )
     else:
+        description = ""
+        if random_job['file_uri']:
+            text, lang = ocr.read_text_from_image_path(random_job['file_uri'])
+            if text:
+                description += "Text from the image:\n{0}\n\n".format(text)
+                translated_text = translate.translate(text)
+                if translated_text:
+                    description += "Translated text from the image:\n{0}\n\n".format(translated_text)
         update.message.reply_text(
             "Random job description"
         )
@@ -622,17 +635,17 @@ def main():
             ],
             SUBMIT_PHOTO_FLOW: [
                 MessageHandler(filters=Filters.photo, callback=image_handler),
-                CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), 
+                CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON),
                 callback=start_command)
             ],
             SUBMIT_LINK_FLOW: [
                 MessageHandler(filters=None, callback=submit_job_text_handler),
-                CommandHandler('start', start_command), 
+                CommandHandler('start', start_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)
             ],
             AWAITING_JOB_ADDRESS: [
-                MessageHandler(filters=None, callback=submit_job_address), 
-                CommandHandler('start', start_command), 
+                MessageHandler(filters=None, callback=submit_job_address),
+                CommandHandler('start', start_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)
             ],
             AWAITING_JOB_PHOTO_TITLE: [MessageHandler(filters=None, callback=parse_job_photo_city), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
