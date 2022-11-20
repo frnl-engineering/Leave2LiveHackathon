@@ -579,7 +579,7 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
     emit_metric(type="user", action="subscribe")
     update.message.reply_text(responses["SUBSCRIBE"], reply_markup=menu_kb_with_unsubscribe)
 
-    two_minutes = 30  # each 30 seconds
+    two_minutes = 10  # each 30 seconds
     job_context = {"user_id": update.message.from_user.id, "chat_id": chat_id}
     context.job_queue.run_repeating(name=job_name, callback=notify_user_about_jobs, interval=two_minutes, context=job_context)
     # Whatever you pass here as context is available in the job.context variable of the callback
