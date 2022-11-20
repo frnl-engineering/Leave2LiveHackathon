@@ -309,9 +309,10 @@ def parse_job_photo_title(update, context):
                 translated_text = translate.translate(text)
                 if translated_text:
                     description += "Translated text from the image:\n{0}\n\n".format(translated_text)
-        update.message.reply_text(
-            "Random job description"
-        )
+        if description:
+            update.message.reply_text(description)
+        else:
+            update.message.reply_text("Random job description")
         # context.bot.send_photo(
         #     chat_id=update.message.chat_id,
         #     photo=open(random_job["file_uri"], 'rb')
