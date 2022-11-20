@@ -19,3 +19,4 @@ googlemaps==4.6.0
 opencv-python==4.6.0.66
 langdetect==1.0.9
 deep-translator==1.5.5
+pytesseract
