@@ -180,6 +180,7 @@ class DBService:
             )
         except Exception as error:
             print(error)
+            raise error
 
     def get_all_raw_jobs(self):
         try:
