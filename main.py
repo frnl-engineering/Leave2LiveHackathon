@@ -6,7 +6,7 @@ import logging
 import uuid
 import datetime
 import random
-
+import base64
 import pytz
 from datetime import datetime as dt
 
@@ -84,8 +84,8 @@ keyboard = [
 job_search_reply_markup = InlineKeyboardMarkup(keyboard)
 
 menu_kb = ReplyKeyboardMarkup([
-    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON], 
-    [SUBMIT_JOB_BUTTON], 
+    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON],
+    [SUBMIT_JOB_BUTTON],
     [PARSE_PHOTO_BUTTON],
     [RESTART_BUTTON]
 ], one_time_keyboard=True)
@@ -388,8 +388,18 @@ def submit_job_text_link(update, context):
     return SUBMIT_LINK_FLOW
 
 
+def image_to_base64(file_uri):
+    try:
+        with open(file_uri, "rb") as imageFile:
+            return base64.b64encode(imageFile.read())
+    except Exception as e:
+        logger.error(e)
+        return None
+
+
 def image_handler(update, context):
     emit_metric(type="etc", action="image_handler")
+    description = ""
     # TODO make transaction atomic
     try:
         msg_file = update.message.photo[-1].file_id
@@ -406,7 +416,7 @@ def image_handler(update, context):
             translated_text = translate.translate(text)
             if translated_text:
                 description += "\n\nTranslated text from image: {0}".format(translated_text)
-
+        # image_base64 = image_to_base64(file_uri)
         dbservice.save_media_uri(message=update.message, image_uri=file_uri)
         raw_job = {
             "description": description,
@@ -415,9 +425,10 @@ def image_handler(update, context):
             "checked": False,
             "created_by": update.message.from_user.id,
             "checked_by": None,
+            # "image_base64": image_base64,
         }
         dbservice.insert_raw_job(raw_job)
-        update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!")
+        update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees! \n\n{0}".format(description))
     except Exception as e:
         print(e)
         update.message.reply_text("Something went wrong, please try again later.", reply_markup=menu_kb)
