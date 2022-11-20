@@ -43,6 +43,7 @@ SAVE_JOB_SEARCH_APPLICATION = 7
 SUBMIT_PHOTO_FLOW = 8
 SUBMIT_LINK_FLOW = 9
 AWAITING_JOB_APPLICANT_LANGUAGE = 10
+AWAITING_JOB_ADDRESS = 11
 
 JOB_SEARCH_BUTTON = "💼 Find job"
 SUBMIT_JOB_BUTTON = "📸 Submit job"
@@ -172,7 +173,18 @@ def submit_job_command(update, context):
         responses["SUBMIT_PHOTO_MESSAGE_2"]
         )
     update.message.reply_text(
-        responses["SUBMIT_PHOTO_MESSAGE_3"],
+        responses["SUBMIT_PHOTO_MESSAGE_3"]
+    )
+    update.message.reply_text(
+         "Just one quick question, where is this job located? Please write the name of the city and if you know full address."
+    )
+    return AWAITING_JOB_ADDRESS
+
+
+def submit_job_address(update, context):
+    context.user_data['job_address'] = update.effective_message.text
+    update.message.reply_text(
+         "Thanks. Do you want to submit a photo or job description?",
         reply_markup=ReplyKeyboardMarkup([[UPLOAD_PHOTO_BUTTON, SHARE_LINK_BUTTON]], one_time_keyboard=True)
     )
     return SUBMIT_JOB_FLOW
@@ -204,13 +216,14 @@ def image_handler(update, context):
         dbservice.save_media_uri(message=update.message, image_uri=file_uri)
         raw_job = {
             "description": update.message.caption,
+            "address": context.user_data['job_address'],
             "file_uri": file_uri,
             "checked": False,
             "created_by": update.message.from_user.id,
             "checked_by": None,
         }
         dbservice.insert_raw_job(raw_job)
-        update.message.reply_text("Image received", reply_markup=menu_kb)
+        update.message.reply_text("Thank you, we received your image.")
     except Exception as e:
         print(e)
         update.message.reply_text("Something went wrong, please try again later", reply_markup=menu_kb)
@@ -221,13 +234,14 @@ def image_handler(update, context):
 def submit_job_text_handler(update, context):
     raw_job = {
         "description": update.message.text,
+        "address": context.user_data['job_address'],
         "file_uri": None,
         "checked": False,
         "created_by": update.message.from_user.id,
         "checked_by": None,
     }
     dbservice.insert_raw_job(raw_job)
-    update.message.reply_text("Text received", reply_markup=menu_kb)
+    update.message.reply_text("Thank you, we saved information about the job.", reply_markup=menu_kb)
     return WELCOME
 
 
@@ -394,6 +408,7 @@ def main():
             ],
             AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories)],
             SAVE_JOB_SEARCH_APPLICATION: [MessageHandler(filters=None, callback=job_search_save_application)],
+            AWAITING_JOB_ADDRESS: [MessageHandler(filters=None, callback=submit_job_address)],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),
               MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_job_text_link)
@@ -410,6 +425,9 @@ def main():
 
     updater.dispatcher.add_handler(handler)
     updater.dispatcher.add_handler(CommandHandler('start', start_command))
+    updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(JOB_SEARCH_BUTTON), callback=job_search_ask_name))
+    updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(SUBMIT_JOB_BUTTON), callback=submit_job_command))
+    updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command))
     updater.dispatcher.add_handler(MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command))
 
     dp.add_error_handler(error)
