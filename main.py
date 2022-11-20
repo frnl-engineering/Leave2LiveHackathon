@@ -54,26 +54,26 @@ AWAITING_JOB_PHOTO_CITY = 13
 AWAITING_JOB_PHOTO_COMPANY = 14
 AWAITING_JOB_PHOTO_CATEGOTY = 15
 
-JOB_SEARCH_BUTTON = "💼 Find job"
-SUBSCRIBE_BUTTON = "💼 Subscribe"
-SUBMIT_JOB_BUTTON = "📸 Submit job"
-PARSE_PHOTO_BUTTON = "📝 Parse job description"
+JOB_SEARCH_BUTTON = "💼 Get a job"
+SUBSCRIBE_BUTTON = "🔔 Subscribe"
+SUBMIT_JOB_BUTTON = "📸 Submit new vacancy"
+PARSE_PHOTO_BUTTON = "📝 Help by parsing job descriptions"
 RESTART_BUTTON = "🔄 Restart"
 YES_BUTTON = "✅ Yes"
 NO_BUTTON = "❌ No"
 UPLOAD_PHOTO_BUTTON = "📸 Upload photo"
 SHARE_LINK_BUTTON = "📝 Share a link/text"
-COURIER_BUTTON = "🚚 Courier"
-WAITER_BUTTON = "💁 Waiter / hostess"
-HANDYMAN_BUTTON = "🔨Handyman in the kitchen / in the hotel"
+COURIER_BUTTON = "Delivery"
+WAITER_BUTTON = "Hostess / Waitress"
+HANDYMAN_BUTTON = "General worker (kitchen or hotel)"
 NEXT_PAGE_BUTTON = "⏭"
 PREV_PAGE_BUTTON = "⏮"
-SUBMIT_CATEGORY_BUTTON = "Submit"
+SUBMIT_CATEGORY_BUTTON = "✉️ Submit"
 
 JOB_CATEGORIES = {
-    "COURIER_BUTTON": "☐ 🚚 Courier",
-    "WAITER_BUTTON": "☐ 💁 Waiter / hostess",
-    "HANDYMAN_BUTTON": "☐ 🔨Handyman in the kitchen / in the hotel"
+    "COURIER_BUTTON": "☐ Delivery",
+    "WAITER_BUTTON": "☐ Hostess / Waitress",
+    "HANDYMAN_BUTTON": "☐ General worker (kitchen or hotel)"
 }
 
 keyboard = [
@@ -84,7 +84,9 @@ keyboard = [
 job_search_reply_markup = InlineKeyboardMarkup(keyboard)
 
 menu_kb = ReplyKeyboardMarkup([
-    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON], [SUBMIT_JOB_BUTTON, PARSE_PHOTO_BUTTON],
+    [JOB_SEARCH_BUTTON, SUBSCRIBE_BUTTON], 
+    [SUBMIT_JOB_BUTTON], 
+    [PARSE_PHOTO_BUTTON],
     [RESTART_BUTTON]
 ], one_time_keyboard=True)
 
@@ -340,8 +342,7 @@ def parse_job_photo_thanks(update, context):
     dbservice.update_raw_job_data(context.user_data['current_job_to_parse_id'], update.message.from_user.id)
 
     update.message.reply_text(
-        responses["PARSE_PHOTO_THANKS"], reply_markup=menu_kb
-        )
+        responses["PARSE_PHOTO_THANKS"], reply_markup=ReplyKeyboardMarkup([[PARSE_PHOTO_BUTTON], [RESTART_BUTTON]], one_time_keyboard=True))
     return WELCOME
 
 
@@ -356,7 +357,7 @@ def submit_job_command(update, context):
         responses["SUBMIT_PHOTO_MESSAGE_3"]
     )
     update.message.reply_text(
-         "Just one quick question, where is this job located? Please write the name of the city and if you know full address."
+         "Just one quick question, where did you spot this job? Please type in name of the city and full address if possible."
     )
     return AWAITING_JOB_ADDRESS
 
@@ -416,10 +417,10 @@ def image_handler(update, context):
             "checked_by": None,
         }
         dbservice.insert_raw_job(raw_job)
-        update.message.reply_text("Thank you, we received your image.")
+        update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!")
     except Exception as e:
         print(e)
-        update.message.reply_text("Something went wrong, please try again later", reply_markup=menu_kb)
+        update.message.reply_text("Something went wrong, please try again later.", reply_markup=menu_kb)
         return WELCOME
     return WELCOME
 
@@ -434,7 +435,7 @@ def submit_job_text_handler(update, context):
         "checked_by": None,
     }
     dbservice.insert_raw_job(raw_job)
-    update.message.reply_text("Thank you, we saved information about the job.", reply_markup=menu_kb)
+    update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!", reply_markup=menu_kb)
     emit_metric(type="etc", action="submit_job_text_handler")
     return WELCOME
 
