@@ -398,9 +398,6 @@ def submit_job_command(update, context):
         reply_markup=ReplyKeyboardMarkup([[UPLOAD_PHOTO_BUTTON, SHARE_LINK_BUTTON]], one_time_keyboard=True)
     )
     emit_metric(type="etc", action="submit_job_command")
-    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
-    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
-    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return SUBMIT_JOB_FLOW
 
 def submit_photo(update, context):
@@ -489,6 +486,9 @@ def submit_job_address(update, context):
     update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!", reply_markup=menu_kb)
     emit_metric(type="etc", action="submit_job_address")
     dbservice.update_raw_job_data_address(context.user_data['current_job_to_submit_id'], context.user_data['job_address'])
+    emit_metric(type="counters", action="unique_users", value=dbservice.count_users())
+    emit_metric(type="counters", action="unique_unchecked_jobs", value=dbservice.count_raw_unchecked_jobs())
+    emit_metric(type="counters", action="unique_verified_jobs", value=dbservice.count_verified_jobs())
     return WELCOME
 
 
