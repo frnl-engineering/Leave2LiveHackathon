@@ -160,7 +160,7 @@ class DBService:
 
     def insert_raw_job(self, raw_job: dict):
         try:
-            self._jobs_to_validate_collection.insert_one(
+            return self._jobs_to_validate_collection.insert_one(
                 {
                     "_id": str(uuid.uuid4()),
                     "created_at": datetime.utcnow(),
@@ -185,6 +185,21 @@ class DBService:
                 },
                 {
                         '$set': { "checked_by": user_id}
+                }
+            )
+            return True
+
+        except Exception as error:
+            print(error)
+    
+    def update_raw_job_data_address(self, raw_job_id, address):
+        try:
+            self._jobs_to_validate_collection.update_one(
+                {
+                    '_id': raw_job_id
+                },
+                {
+                        '$set': { "address": address}
                 }
             )
             return True

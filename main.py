@@ -357,20 +357,11 @@ def submit_job_command(update, context):
         responses["SUBMIT_PHOTO_MESSAGE_3"]
     )
     update.message.reply_text(
-         "Just one quick question, where did you spot this job? Please type in name of the city and full address if possible."
-    )
-    return AWAITING_JOB_ADDRESS
-
-
-def submit_job_address(update, context):
-    context.user_data['job_address'] = update.effective_message.text
-    update.message.reply_text(
-         "Thanks. Do you want to submit a photo or job description?",
+        responses["SUBMIT_PHOTO_MESSAGE_4"],
         reply_markup=ReplyKeyboardMarkup([[UPLOAD_PHOTO_BUTTON, SHARE_LINK_BUTTON]], one_time_keyboard=True)
     )
     emit_metric(type="etc", action="submit_job_command")
     return SUBMIT_JOB_FLOW
-
 
 def submit_photo(update, context):
     update.message.reply_text(
@@ -410,33 +401,41 @@ def image_handler(update, context):
         dbservice.save_media_uri(message=update.message, image_uri=file_uri)
         raw_job = {
             "description": description,
-            "address": context.user_data['job_address'],
+            "address": None,
             "file_uri": file_uri,
             "checked": False,
             "created_by": update.message.from_user.id,
             "checked_by": None,
         }
-        dbservice.insert_raw_job(raw_job)
-        update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!")
+        current_job_to_submit_id = dbservice.insert_raw_job(raw_job)
+        context.user_data['current_job_to_submit_id'] = current_job_to_submit_id
     except Exception as e:
         print(e)
         update.message.reply_text("Something went wrong, please try again later.", reply_markup=menu_kb)
         return WELCOME
-    return WELCOME
+    return AWAITING_JOB_ADDRESS
 
 
 def submit_job_text_handler(update, context):
     raw_job = {
         "description": update.message.text,
-        "address": context.user_data['job_address'],
+        "address": None,
         "file_uri": None,
         "checked": False,
         "created_by": update.message.from_user.id,
         "checked_by": None,
     }
-    dbservice.insert_raw_job(raw_job)
-    update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!", reply_markup=menu_kb)
+    current_job_to_submit_id = dbservice.insert_raw_job(raw_job)
+    context.user_data['current_job_to_submit_id'] = current_job_to_submit_id
+    update.message.reply_text("By the way, where did you spot this job? Please type in name of the city and full address if possible.")
     emit_metric(type="etc", action="submit_job_text_handler")
+    return AWAITING_JOB_ADDRESS
+
+def submit_job_address(update, context):
+    context.user_data['job_address'] = update.effective_message.text
+    update.message.reply_text("Thank you! We will review this vacancy and if found relevant share with refugees!", reply_markup=menu_kb)
+    emit_metric(type="etc", action="submit_job_address")
+    dbservice.update_raw_job_data_address(context.user_data['current_job_to_submit_id'], context.user_data['job_address'])
     return WELCOME
 
 
@@ -536,11 +535,13 @@ def subscribe_command(update: Update, context: CallbackContext) -> None:
 def help_command(update, context):
     update.message.reply_text("Use /start to test this bot.")
     emit_metric(type="etc", action="help")
+    return WELCOME
 
 
 def free_input_command(update, context):
     update.message.reply_text("Sorry, I didn't understand what you said. Try using one of our commands", reply_markup=menu_kb)
     emit_metric(type="etc", action="free_input_command")
+    return WELCOME
 
 
 def error(update, context):
@@ -563,31 +564,41 @@ def main():
                 MessageHandler(filters=Filters.text(SUBSCRIBE_BUTTON), callback=subscribe_command),
                 MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command),
                 ],
-            AWAITING_JOB_APPLICANT_NAME: [MessageHandler(filters=None, callback=job_search_ask_postcode), CommandHandler('start', start_command)],
-            AWAITING_JOB_APPLICANT_POSTCODE: [MessageHandler(filters=None, callback=job_search_confirm_postcode), CommandHandler('start', start_command)],
+            AWAITING_JOB_APPLICANT_NAME: [MessageHandler(filters=None, callback=job_search_ask_postcode), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
+            AWAITING_JOB_APPLICANT_POSTCODE: [MessageHandler(filters=None, callback=job_search_confirm_postcode), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
             CONFIRM_JOB_APPLICANT_POSTCODE: [
                 MessageHandler(filters=Filters.text(YES_BUTTON), callback=job_search_ask_language),
                 MessageHandler(filters=Filters.text(NO_BUTTON), callback=job_search_ask_postcode),
-                CommandHandler('start', start_command)
+                CommandHandler('start', start_command),
+                MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)
             ],
-            AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories), CommandHandler('start', start_command)],
-            SAVE_JOB_SEARCH_APPLICATION: [CallbackQueryHandler(keyboard_callback), CommandHandler('start', start_command)],
-            AWAITING_JOB_ADDRESS: [MessageHandler(filters=None, callback=submit_job_address), CommandHandler('start', start_command)],
+            AWAITING_JOB_APPLICANT_LANGUAGE: [MessageHandler(filters=None, callback=job_search_ask_job_categories), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
+            SAVE_JOB_SEARCH_APPLICATION: [CallbackQueryHandler(keyboard_callback), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
             SUBMIT_JOB_FLOW: [
               MessageHandler(filters=Filters.text(UPLOAD_PHOTO_BUTTON), callback=submit_photo),
               MessageHandler(filters=Filters.text(SHARE_LINK_BUTTON), callback=submit_job_text_link),
-              CommandHandler('start', start_command)
+              CommandHandler('start', start_command),
+              MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)
             ],
             SUBMIT_PHOTO_FLOW: [
-                MessageHandler(filters=Filters.photo, callback=image_handler), CommandHandler('start', start_command)
+                MessageHandler(filters=Filters.photo, callback=image_handler),
+                CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), 
+                callback=start_command)
             ],
             SUBMIT_LINK_FLOW: [
-                MessageHandler(filters=None, callback=submit_job_text_handler), CommandHandler('start', start_command)
+                MessageHandler(filters=None, callback=submit_job_text_handler),
+                CommandHandler('start', start_command), 
+                MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)
             ],
-            AWAITING_JOB_PHOTO_TITLE: [MessageHandler(filters=None, callback=parse_job_photo_city), CommandHandler('start', start_command)],
-            AWAITING_JOB_PHOTO_CITY: [MessageHandler(filters=None, callback=parse_job_photo_company), CommandHandler('start', start_command)],
-            AWAITING_JOB_PHOTO_COMPANY: [MessageHandler(filters=None, callback=parse_job_photo_category), CommandHandler('start', start_command)],
-            AWAITING_JOB_PHOTO_CATEGOTY: [MessageHandler(filters=None, callback=parse_job_photo_thanks), CommandHandler('start', start_command)],
+            AWAITING_JOB_ADDRESS: [
+                MessageHandler(filters=None, callback=submit_job_address), 
+                CommandHandler('start', start_command), 
+                MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)
+            ],
+            AWAITING_JOB_PHOTO_TITLE: [MessageHandler(filters=None, callback=parse_job_photo_city), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
+            AWAITING_JOB_PHOTO_CITY: [MessageHandler(filters=None, callback=parse_job_photo_company), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
+            AWAITING_JOB_PHOTO_COMPANY: [MessageHandler(filters=None, callback=parse_job_photo_category), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
+            AWAITING_JOB_PHOTO_CATEGOTY: [MessageHandler(filters=None, callback=parse_job_photo_thanks), CommandHandler('start', start_command), MessageHandler(filters=Filters.text(RESTART_BUTTON), callback=start_command)],
       },
       fallbacks=[MessageHandler(Filters.text, free_input_command)],
       )
