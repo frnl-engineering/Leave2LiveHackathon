@@ -21,11 +21,13 @@ def get_tesseract_lang(detected_lang):
 
 def read_text_from_image_path(image_path: str, lang=DEFAULT_LANG) -> (str, str):
     minimal_confidence = 20
-    custom_config = r'-l {0} --psm 3'.format(lang)
+    custom_config = r"-l {0} --psm 3".format(lang)
     img = cv2.imread(image_path)
 
     try:
-        results = pytesseract.image_to_data(img, output_type=Output.DICT, config=custom_config)
+        results = pytesseract.image_to_data(
+            img, output_type=Output.DICT, config=custom_config
+        )
         res = ""
 
         # loop over each of the individual text localizations
@@ -73,16 +75,18 @@ def read_text_from_image_path(image_path: str, lang=DEFAULT_LANG) -> (str, str):
         print(e)
     if lang == DEFAULT_LANG:
         # when we detected used language, we use it again to get more precise results
-        return read_text_from_image_path(image_path=image_path, lang=get_tesseract_lang(detected_lang))
+        return read_text_from_image_path(
+            image_path=image_path, lang=get_tesseract_lang(detected_lang)
+        )
     return res, detected_lang
 
 
 def test():
-    print(read_text_from_image_path('./media/nl1.jpeg'))
-    print(read_text_from_image_path('./media/nl2.jpeg'))
-    print(read_text_from_image_path('./media/rus1.jpeg'))
-    print(read_text_from_image_path('./media/ukr1.jpeg'))
+    print(read_text_from_image_path("./media/nl1.jpeg"))
+    print(read_text_from_image_path("./media/nl2.jpeg"))
+    print(read_text_from_image_path("./media/rus1.jpeg"))
+    print(read_text_from_image_path("./media/ukr1.jpeg"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()

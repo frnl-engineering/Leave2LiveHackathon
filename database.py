@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime
 
 import pymongo
-import os
 
 
 class DBService:
@@ -66,12 +65,7 @@ class DBService:
     def update_user_data(self, user_id, update_dict):
         try:
             res = self._users_collection.update_one(
-                {
-                    '_id': user_id
-                },
-                {
-                     '$set': { **update_dict }
-                }
+                {"_id": user_id}, {"$set": {**update_dict}}
             )
             return True
 
@@ -122,10 +116,7 @@ class DBService:
 
     def save_media_uri(self, image_uri, message):
         try:
-            if (
-                self._media_collection.count_documents({"uri": image_uri})
-                == 0
-            ):
+            if self._media_collection.count_documents({"uri": image_uri}) == 0:
                 self._media_collection.insert_one(
                     {
                         "uri": image_uri,
@@ -184,40 +175,32 @@ class DBService:
 
     def get_all_raw_jobs(self):
         try:
-            return list(self._jobs_to_validate_collection.find({ "checked_by": None }))
+            return list(self._jobs_to_validate_collection.find({"checked_by": None}))
         except Exception as error:
             print(error)
 
     def count_raw_unchecked_jobs(self):
         try:
-            return self._jobs_to_validate_collection.count_documents({"checked_by": None})
+            return self._jobs_to_validate_collection.count_documents(
+                {"checked_by": None}
+            )
         except Exception as error:
             print(error)
 
     def update_raw_job_data(self, raw_job_id, user_id):
         try:
             self._jobs_to_validate_collection.update_one(
-                {
-                    '_id': raw_job_id
-                },
-                {
-                        '$set': { "checked_by": user_id}
-                }
+                {"_id": raw_job_id}, {"$set": {"checked_by": user_id}}
             )
             return True
 
         except Exception as error:
             print(error)
-    
+
     def update_raw_job_data_address(self, raw_job_id, address):
         try:
             self._jobs_to_validate_collection.update_one(
-                {
-                    '_id': raw_job_id
-                },
-                {
-                        '$set': { "address": address}
-                }
+                {"_id": raw_job_id}, {"$set": {"address": address}}
             )
             return True
 
@@ -245,10 +228,15 @@ class DBService:
         try:
             offset = page * limit
             return {
-                "jobs": list(self._jobs_collection.find(filter).sort("updated_at", -1).limit(limit).skip(offset)),
+                "jobs": list(
+                    self._jobs_collection.find(filter)
+                    .sort("updated_at", -1)
+                    .limit(limit)
+                    .skip(offset)
+                ),
                 "limit": limit,
                 "offset": offset,
-                "total": self._jobs_collection.count_documents(filter)
+                "total": self._jobs_collection.count_documents(filter),
             }
 
         except Exception as error:
